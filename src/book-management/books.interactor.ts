@@ -3,6 +3,7 @@ import { IInteractor } from "../../core/interactor";
 import { IBookBase, IBook } from "./models/books.model";
 import { BookRepository } from "./books.repository";
 import { Menu } from "../../core/menu";
+import { getEditableInput } from "../../core/print.utils";
 
 const menu = new Menu("Book Management", [
   { key: "1", label: "Add Book" },
@@ -44,14 +45,14 @@ export class BookInteractor implements IInteractor {
 }
 
 async function getBookInput(): Promise<IBookBase> {
-  const title = await readLine("Please enter title:");
-  const author = await readLine("Please enter author:");
-  const publisher = await readLine("Please enter publisher:");
-  const genre = await readLine("Please enter genre:");
-  const isbnNo = await readLine("Please enter isbnNo:");
-  const numofPages = +(await readLine("Please enter number of pages:"));
+  const title = await readLine(`Please enter title:`);
+  const author = await readLine(`Please enter author:`);
+  const publisher = await readLine(`Please enter publisher:`);
+  const genre = await readLine(`Please enter genre:`);
+  const isbnNo = await readLine(`Please enter isbnNo:`);
+  const numofPages = +(await readLine(`Please enter number of pages:`));
   const totalNumberOfCopies = +(await readLine(
-    "Please enter total num of Copies:"
+    `Please enter total num of Copies:`
   ));
 
   return {
@@ -74,24 +75,27 @@ async function addBook(repo: BookRepository) {
 
 async function updateBook(repo: BookRepository) {
   const id = +(await readLine("Please enter the ID of the book to update:"));
-  const existingBook = repo.getById(id);
-
-  if (!existingBook) {
+  const book = repo.getById(id)!;
+  if (!book) {
     console.log(`Book with ID ${id} not found.`);
     return;
   }
-
-  const updatedBookInput: IBookBase = await getBookInput();
-  const updatedBook: IBook = {
-    ...existingBook,
-    ...updatedBookInput,
-  };
-
-  const result = repo.update(id, updatedBook);
-  if (result) {
-    console.log("Book updated successfully\nUpdated Book:");
-    console.table(result);
-  } else {
-    console.log(`Failed to update book with ID ${id}.`);
-  }
+  book.title = await getEditableInput("Please updated title: ", book.title);
+  book.author = await getEditableInput("Please updated author: ", book.author);
+  book.publisher = await getEditableInput(
+    "Please updated publisher: ",
+    book.publisher
+  );
+  book.genre = (
+    await getEditableInput("Please updated genre: ", book.genre.join(" "))
+  ).split(" ");
+  book.isbnNo = await getEditableInput("Please updated ISBN.NO: ", book.isbnNo);
+  book.numofPages = +(await getEditableInput(
+    "Please updated number of pages: ",
+    book.numofPages
+  ));
+  book.totalNumberOfCopies = +(await getEditableInput(
+    "Please updated total number of copies: ",
+    book.totalNumberOfCopies
+  ));
 }

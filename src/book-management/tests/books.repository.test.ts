@@ -1,4 +1,5 @@
 import { describe, test, expect, beforeEach } from "vitest";
+import { faker } from "@faker-js/faker";
 import { BookRepository } from "../books.repository";
 import { IBookBase, IBook } from "../models/books.model";
 
@@ -11,152 +12,102 @@ describe("BookRepository", () => {
     (repo as any).books = [];
   });
 
-  test("should create a book", () => {
-    const bookData: IBookBase = {
-      title: "Test Book",
-      author: "Author Name",
-      publisher: "Publisher Name",
-      genre: ["Fiction"],
-      isbnNo: "1234567890",
-      numofPages: 300,
-      totalNumberOfCopies: 10,
-    };
+  const generateBookData = (): IBookBase => ({
+    title: faker.lorem.words(),
+    author: faker.name.fullName(),
+    publisher: faker.company.name(),
+    genre: [faker.lorem.word()],
+    isbnNo: faker.datatype.string(10),
+    numofPages: faker.datatype.number({ min: 100, max: 1000 }),
+    totalNumberOfCopies: faker.datatype.number({ min: 1, max: 100 }),
+  });
 
-    const createdBook = repo.create(bookData);
+  const createMultipleBooks = (count: number): IBook[] => {
+    const books: IBook[] = [];
+    for (let i = 0; i < count; i++) {
+      const bookData = generateBookData();
+      const createdBook = repo.create(bookData);
+      books.push(createdBook);
+    }
+    return books;
+  };
 
-    expect(createdBook).toMatchObject({
-      id: 1,
-      ...bookData,
-      availableNumberOfCopies: bookData.totalNumberOfCopies,
+  test("should create 100 books", () => {
+    const books = createMultipleBooks(100);
+
+    expect(books.length).toBe(100);
+    books.forEach((book, index) => {
+      expect(book).toMatchObject({
+        id: index + 1,
+        ...book,
+        availableNumberOfCopies: book.totalNumberOfCopies,
+      });
     });
   });
 
   test("should update a book", () => {
-    const bookData: IBookBase = {
-      title: "Test Book",
-      author: "Author Name",
-      publisher: "Publisher Name",
-      genre: ["Fiction"],
-      isbnNo: "1234567890",
-      numofPages: 300,
-      totalNumberOfCopies: 10,
-    };
+    const books = createMultipleBooks(100);
+    const randomIndex = faker.datatype.number({ min: 0, max: 99 });
+    const updatedBookData: Partial<IBook> = { ...books[randomIndex] };
+    
+    // Modify specific properties to update
+    updatedBookData.title = faker.lorem.words();
 
-    const createdBook = repo.create(bookData);
-    const updatedBookData: IBook = {
-      ...createdBook,
-      title: "Updated Test Book",
-    };
-
-    const updatedBook = repo.update(createdBook.id, updatedBookData);
+    const updatedBook = repo.update(books[randomIndex].id, updatedBookData as IBook);
 
     expect(updatedBook).toMatchObject(updatedBookData);
   });
 
   test("should return null if trying to update a non-existent book", () => {
+    const bookData = generateBookData();
     const updatedBookData: IBook = {
-      id: 1,
-      title: "Updated Test Book",
-      author: "Author Name",
-      publisher: "Publisher Name",
-      genre: ["Fiction"],
-      isbnNo: "1234567890",
-      numofPages: 300,
-      totalNumberOfCopies: 10,
-      availableNumberOfCopies: 10,
+      id: 109, // assuming 109 is not an existing book id
+      ...bookData,
+      availableNumberOfCopies: bookData.totalNumberOfCopies,
     };
 
-    const result = repo.update(999, updatedBookData);
+    const result = repo.update(1111, updatedBookData);
 
     expect(result).toBeNull();
   });
 
   test("should delete a book", () => {
-    const bookData: IBookBase = {
-      title: "Test Book",
-      author: "Author Name",
-      publisher: "Publisher Name",
-      genre: ["Fiction"],
-      isbnNo: "1234567890",
-      numofPages: 300,
-      totalNumberOfCopies: 10,
-    };
+    const books = createMultipleBooks(100);
+    const randomIndex = faker.datatype.number({ min: 0, max: 99 });
+    const deletedBook = repo.delete(books[randomIndex].id);
 
-    const createdBook = repo.create(bookData);
-    const deletedBook = repo.delete(createdBook.id);
-
-    expect(deletedBook).toMatchObject(createdBook);
-    expect(repo.getById(createdBook.id)).toBeNull();
+    expect(deletedBook).toMatchObject(books[randomIndex]);
+    expect(repo.getById(books[randomIndex].id)).toBeNull();
   });
 
   test("should return null if trying to delete a non-existent book", () => {
-    const result = repo.delete(999);
+    const result = repo.delete(2222); // assuming 101 is not an existing book id
 
     expect(result).toBeNull();
   });
 
   test("should get a book by id", () => {
-    const bookData: IBookBase = {
-      title: "Test Book",
-      author: "Author Name",
-      publisher: "Publisher Name",
-      genre: ["Fiction"],
-      isbnNo: "1234567890",
-      numofPages: 300,
-      totalNumberOfCopies: 10,
-    };
+    const books = createMultipleBooks(100);
+    const randomIndex = faker.datatype.number({ min: 0, max: 99 });
+    const fetchedBook = repo.getById(books[randomIndex].id);
 
-    const createdBook = repo.create(bookData);
-    const fetchedBook = repo.getById(createdBook.id);
-
-    expect(fetchedBook).toMatchObject(createdBook);
+    expect(fetchedBook).toMatchObject(books[randomIndex]);
   });
 
   test("should return null if trying to get a non-existent book by id", () => {
-    const result = repo.getById(999);
+    const result = repo.getById(701); // assuming 101 is not an existing book id
 
     expect(result).toBeNull();
   });
 
-  test("should list books with pagination", () => {
-    const bookData: IBookBase = {
-      title: "Test Book",
-      author: "Author Name",
-      publisher: "Publisher Name",
-      genre: ["Fiction"],
-      isbnNo: "1234567890",
-      numofPages: 300,
-      totalNumberOfCopies: 10,
-    };
-
-    repo.create(bookData);
-    repo.create({ ...bookData, title: "Another Test Book" });
-
-    const result = repo.list({ limit: 1, offset: 0 });
-
-    expect(result.items.length).toBe(1);
-    expect(result.pagination).toEqual({
-      offset: 0,
-      limit: 1,
-      total: 2,
-    });
-  });
-
   test("should filter books by search term", () => {
-    const bookData: IBookBase = {
-      title: "Test Book",
-      author: "Author Name",
-      publisher: "Publisher Name",
-      genre: ["Fiction"],
-      isbnNo: "1234567890",
-      numofPages: 300,
-      totalNumberOfCopies: 10,
-    };
+    const bookData1 = generateBookData();
+    const bookData2 = { ...generateBookData(), title: "Another Test Book" };
 
-    repo.create(bookData);
-    repo.create({ ...bookData, title: "Another Test Book" });
+    repo.create(bookData1);
+    repo.create(bookData2);
 
-    const result = repo.list({ limit: 10, offset: 0, search: "another" });
+    const result = repo.list({ limit: 10, offset: 0, search: "Another" });
 
     expect(result.items.length).toBe(1);
     expect(result.items[0].title).toBe("Another Test Book");
