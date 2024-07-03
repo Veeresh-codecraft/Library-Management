@@ -9,6 +9,9 @@
   "author": "Veersh , Nagaraj, Vedanth",
   "license": "ISC",
   "devDependencies": {
+    "@testing-library/dom": "^10.3.0",
+    "@types/node": "^20.14.9",
+    "@vitest/ui": "^1.6.0",
     "typescript": "^5.5.3",
     "vitest": "^1.6.0"
   }
