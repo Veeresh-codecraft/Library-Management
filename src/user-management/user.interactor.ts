@@ -10,11 +10,12 @@ const menu = `
     1. Add User
     2. Update User
     3. Search User
-    4. list user
-    5. dlt User
+    4. List Users
+    5. Delete User
     6. Exit
-    `;
+`;
 
+// Schema validation for user input
 const userSchema = z.object({
   name: z
     .string()
@@ -29,15 +30,22 @@ const userSchema = z.object({
     .min(1000000000, "Phone number must be at least 10 digits"),
 });
 
+/**
+ * Class representing the user interactor.
+ * @implements {IInteractor}
+ */
 export class UserInteractor implements IInteractor {
   private repo = new UserRepository(new Database("../data/data.json"));
 
+  /**
+   * Displays the menu and handles user input.
+   * @returns {Promise<void>}
+   */
   async showMenu(): Promise<void> {
     const op = await readChar(menu);
     switch (op.toLowerCase()) {
       case "1":
         await addUser(this.repo);
-        // TODO add book flow
         break;
       case "2":
         console.log("Update");
@@ -65,25 +73,36 @@ export class UserInteractor implements IInteractor {
   }
 }
 
+/**
+ * Prompts the user for input and validates it.
+ * @param {IUser} [previous={ name: "", DOB: "", phoneNum: +"", UId: -1 }] - The previous user data.
+ * @returns {Promise<IUserBase>} The validated user input.
+ */
 async function getUserInput(
-  previous: IUser = { name: "", DOB: "", phoneNum: 0, UId: -1 }
+  previous: IUser = { name: "", DOB: "", phoneNum: +"", UId: -1 }
 ): Promise<IUserBase> {
-  previous.name = await readLine(`Please enter the Name (${previous?.name}):`);
-  previous.DOB = await readLine(
+  const name = await readLine(`Please enter the Name (${previous?.name}):`);
+  const DOB = await readLine(
     `Please enter the Date Of Birth (${previous?.DOB}):`
   );
-  previous.phoneNum = parseInt(
-    await readLine(`Please enter the Phone Number (${previous?.phoneNum}):`)
+  const phoneNum = await readLine(
+    `Please enter the Phone Number (${previous?.phoneNum}):`
   );
 
-  const parsed = userSchema.safeParse(previous);
+  const parsed = userSchema.safeParse({
+    name: name,
+    DOB: DOB,
+    phoneNum: +phoneNum,
+  });
+
+  if (previous.UId !== -1) {
+    return { name: name, DOB: DOB, phoneNum: +phoneNum };
+  }
 
   if (!parsed.success) {
-    console.log(
-      chalk.red("Invalid input:"),
-      parsed.error.issues.forEach((error) =>
-        console.log(chalk.red(error.message))
-      )
+    console.log(chalk.red("Invalid input:"));
+    parsed.error.issues.forEach((error) =>
+      console.log(chalk.red(error.message))
     );
     return getUserInput(previous); // Prompt again if validation fails
   }
@@ -91,17 +110,24 @@ async function getUserInput(
   return parsed.data;
 }
 
+/**
+ * Adds a new user to the repository.
+ * @param {UserRepository} repo - The user repository.
+ */
 async function addUser(repo: UserRepository) {
   const user: IUserBase = await getUserInput();
   repo.create(user);
 }
 
+/**
+ * Updates an existing user in the repository.
+ * @param {UserRepository} repo - The user repository.
+ * @param {number} UIdToUpdate - The ID of the user to update.
+ */
 async function updateUser(repo: UserRepository, UIdToUpdate: number) {
   const user: IUser = repo.getById(UIdToUpdate)!;
   const updatedData = await getUserInput(user);
-  if (updatedData.name) user.name = updatedData.name;
-  if (updatedData.DOB) user.DOB = updatedData.DOB;
-  if (updatedData.phoneNum) user.phoneNum = updatedData.phoneNum;
+  repo.update(UIdToUpdate, updatedData);
 }
 
 const a: UserInteractor = new UserInteractor();
