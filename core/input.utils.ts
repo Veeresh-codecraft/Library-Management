@@ -10,14 +10,15 @@ export const readChar = (question: string): Promise<string> => {
 
     const onData = async (key: Buffer) => {
       process.stdin.setRawMode(false);
-      process.stdin.removeListener("data",onData);
+      process.stdin.removeListener("data", onData);
       const char = key.toString("utf-8");
-      if (char.charCodeAt(0) === 3)
-      { process.exit(0); }
+      if (char.charCodeAt(0) === 3) {
+        process.exit(0);
+      }
       resolve(char);
     };
 
-    process.stdin.once("data", onData);
+    process.stdin.addListener("data", onData);
   });
 };
 
@@ -31,4 +32,4 @@ export const readLine = (question: string): Promise<string> => {
     };
     process.stdin.addListener("data", onData);
   });
-};    
+};

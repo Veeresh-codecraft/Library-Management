@@ -10,7 +10,7 @@ import { warningTheme } from "../../core/themes";
     {key:"3",label:"Search book"},
     {key:"4",label:"<Pervious Menu>"},]);
 export class BookInteractor implements IInteractor {
-    private repo = new BookRepository();
+  private repo = new BookRepository();
   async showMenu(): Promise<void> {
     let loop = true;
     while (loop) {
@@ -33,36 +33,35 @@ export class BookInteractor implements IInteractor {
             // TODO add book flow
             break;
         }
+      } else {
+        console.log("\n Invalid input \n\n");
       }
-      else {
-          console.log("\n Invalid input \n\n");
-        }
-      }
-    
+    }
   }
 }
 
-
-async function getBookInput():Promise<IBookBase> {
+async function getBookInput(): Promise<IBookBase> {
   const title = await readLine("Please enter title:");
   const author = await readLine("Please enter author:");
   const publisher = await readLine("Please enter publisher:");
   const genre = await readLine("Please enter genre:");
   const isbnNo = await readLine("Please enter isbnNo:");
-  const numofPages = +await readLine("Please enter number of pages:");
-  const totalNumberOfCopies = +await readLine("Please enter total num of Copies:");
+  const numofPages = +(await readLine("Please enter number of pages:"));
+  const totalNumberOfCopies = +(await readLine(
+    "Please enter total num of Copies:"
+  ));
   return {
-title:title,
-author:author,
-publisher:publisher,
-genre:[genre],
-isbnNo:isbnNo,
-numofPages:numofPages,
-totalNumberOfCopies:totalNumberOfCopies,
+    title: title,
+    author: author,
+    publisher: publisher,
+    genre: [genre],
+    isbnNo: isbnNo,
+    numofPages: numofPages,
+    totalNumberOfCopies: totalNumberOfCopies,
+  };
 }
-} 
 
-async function addBook(repo:BookRepository) {
+async function addBook(repo: BookRepository) {
   const book: IBookBase = await getBookInput();
   const createBook = repo.create(book);
   console.log(warningTheme("\n\tbook added succesfully !:\n"))
