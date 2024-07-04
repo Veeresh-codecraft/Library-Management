@@ -1,8 +1,9 @@
-import { readChar,readLine } from "../../core/input.utils";
+import { readLine } from "../../core/input.utils";
 import { IInteractor } from "../../core/interactor";
 import { IBookBase } from "./models/books.model";
 import { BookRepository } from "./books.repository";
 import { Menu } from "../../core/menu";
+import { warningTheme } from "../../core/themes";
     const menu = new Menu(" Book Management ",[
     {key:"1",label:" Add Book"},
     {key:"2",label:" Edit Book"},
@@ -17,14 +18,14 @@ export class BookInteractor implements IInteractor {
       if (op) {
         switch (op?.key.toLowerCase()) {
           case "1":
-            // TODO add book flow
+            // TODO add zod validation
             await addBook(this.repo);
             break;
           case "2":
-            // TODO add book flow
+            // TODO add zod validation and update logic 
             break;
           case "3":
-            // TODO add book flow
+            // TODO add  zod validation
             console.table(this.repo.list({ limit: 1000, offset: 0 }).items);
             break;
           case "4":
@@ -64,6 +65,6 @@ totalNumberOfCopies:totalNumberOfCopies,
 async function addBook(repo:BookRepository) {
   const book: IBookBase = await getBookInput();
   const createBook = repo.create(book);
-  console.log("book added succesfully\n Book Id:")
-  console.table(book);
+  console.log(warningTheme("\n\tbook added succesfully !:\n"))
+  console.table(createBook);
 }

@@ -1,4 +1,5 @@
 import { readChar } from "./input.utils";
+import { choiceTheme,menuTitleTheme } from "./themes";
 
 export interface IMenuItem {
   key: string;
@@ -8,7 +9,7 @@ export interface IMenuItem {
 export class Menu {
   constructor(
     private readonly title: string,
-    private items: IMenuItem[] = []
+    private items: IMenuItem[] = [],
   ) {}
   serialize(): string {
     let str = this.items.reduce((str, item) => {
@@ -17,7 +18,7 @@ export class Menu {
       }
       str += `${item.key}.\t${item.label}`;
       return str;
-    }, `${this.title}`);
+    }, `${menuTitleTheme(this.title)}`);
     str += `\n\nChoice: `;
     return str;
   }
@@ -29,7 +30,9 @@ export class Menu {
     const op = await readChar(this.serialize());
     const menuItem = this.getItem(op);
     if (menuItem) {
-      console.log(`${menuItem.key}\t${menuItem.label}`);
+      console.log(
+        `${choiceTheme(menuItem.key)}\t${choiceTheme(menuItem.label)}`
+      );
       console.log("\n");
     } else {
       console.log(op);

@@ -1,7 +1,8 @@
 import  { emitKeypressEvents } from "node:readline";
+import { menuItemTheme, questionTheme } from "./themes";
 
 export const readChar = (question: string): Promise<string> => {
-  console.log(question);
+  console.log(menuItemTheme(question));
   return new Promise((resolve) => {
     emitKeypressEvents(process.stdin);
     process.stdin.setRawMode(true);
@@ -22,7 +23,7 @@ export const readChar = (question: string): Promise<string> => {
 
 export const readLine = (question: string): Promise<string> => {
   return new Promise((resolve) => {
-    process.stdout.write(question);
+    process.stdout.write(questionTheme(question));
     const onData = async (key: Buffer) => {
       process.stdin.removeListener("data", onData);
       const input = key.toString("utf-8");
