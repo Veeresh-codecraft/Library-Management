@@ -4,16 +4,21 @@ import { IBookBase, IBook } from "./models/books.model";
 import { BookRepository } from "./books.repository";
 import { Menu } from "../../core/menu";
 import { getEditableInput } from "../../core/print.utils";
-
+import { Database } from "../../db/db";
+import * as readline from "readline";
 const menu = new Menu("Book Management", [
   { key: "1", label: "Add Book" },
   { key: "2", label: "Edit Book" },
-  { key: "3", label: "Search Book" },
-  { key: "4", label: "<Previous Menu>" },
+  { key: "3", label: "Delete Book" },
+  { key: "4", label: "Search Book" },
+  { key: "5", label: "List Book" },
+  { key: "6", label: "<Previous Menu>" },
 ]);
 
 export class BookInteractor implements IInteractor {
-  private repo = new BookRepository();
+  private repo = new BookRepository(
+    new Database("../Library-Management/data/books.json")
+  );
 
   async showMenu(): Promise<void> {
     let loop = true;
@@ -28,9 +33,15 @@ export class BookInteractor implements IInteractor {
             await updateBook(this.repo);
             break;
           case "3":
-            console.table(this.repo.list({ limit: 1000, offset: 0 }).items);
+            await deleteBook(this.repo);
             break;
           case "4":
+            console.table(this.repo.list({ limit: 1000, offset: 0 }).items);
+            break;
+          case "5":
+            await showPaginatedBooks(this.repo);
+            break;
+          case "6":
             loop = false;
             break;
           default:
@@ -71,9 +82,9 @@ async function getBookInput(): Promise<IBookBase> {
 
 async function addBook(repo: BookRepository) {
   const book: IBookBase = await getBookInput();
-  const createBook = repo.create(book);
+  const createdBook = await repo.create(book);
   console.log("Book added successfully\nBook Id:");
-  console.table(createBook);
+  console.table(createdBook);
 }
 
 
@@ -102,5 +113,78 @@ async function updateBook(repo: BookRepository) {
     "Please updated total number of copies: ",
     book.totalNumberOfCopies
   ));
+  repo.update(id, book);
+  console.log("Updated Successfully");
+  console.table(book);
+}
+
+async function deleteBook(repo: BookRepository) {
+  const bookId = await readLine(`Please enter book id to delete:`);
+  const deletedBook = await repo.delete(+bookId);
+  console.log("Book deleted successfully\nDeleted Book:");
+  console.table(deletedBook);
+}
+
+async function showPaginatedBooks(repo: BookRepository): Promise<void> {
+  let offset = 0;
+  const limit = 10; // Number of items per page
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    terminal: true,
+  });
+
+  readline.emitKeypressEvents(process.stdin);
+  if (process.stdin.isTTY) {
+    process.stdin.setRawMode(true);
+  }
+
+  const handleKeyPress = (
+    chunk: Buffer,
+    key: { name: string; sequence: string }
+  ) => {
+    if (key.name === "q") {
+      rl.close();
+      return; // Exit the function to return to the books menu
+    }
+    if (
+      key.name === "right" &&
+      repo.list({ limit, offset }).pagination.hasNext
+    ) {
+      offset += limit;
+    } else if (
+      key.name === "left" &&
+      repo.list({ limit, offset }).pagination.hasPrevious
+    ) {
+      offset -= limit;
+    } else if (key.name === "q") {
+      rl.close();
+      return; // Exit the function to return to the books menu
+    }
+    showPage();
+  };
+
+  const showPage = () => {
+    const response = repo.list({ limit, offset });
+    console.clear();
+    console.table(response.items);
+    console.log(
+      "Press '→' for next page, '←' for previous page, or 'q' to quit."
+    );
+  };
+
+  process.stdin.on("keypress", handleKeyPress);
+  showPage();
+
+  await new Promise<void>((resolve) => {
+    rl.on("close", resolve);
+  });
+
+  process.stdin.removeListener("keypress", handleKeyPress);
+  if (process.stdin.isTTY) {
+    process.stdin.setRawMode(false);
+  }
+  process.stdin.resume();
 }
 

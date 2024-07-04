@@ -1,4 +1,4 @@
-import  { emitKeypressEvents } from "node:readline";
+import { emitKeypressEvents } from "node:readline";
 import { menuItemTheme, questionTheme } from "./themes";
 
 export const readChar = (question: string): Promise<string> => {

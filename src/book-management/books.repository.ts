@@ -1,27 +1,29 @@
-import { IPageRequest, IPagedResponse } from "../../core/pagination";
+import { IPageRequest, IPagedResponse } from "../../core/pagination.model";
 import { IRepository } from "../../core/repository";
 import { IBookBase, IBook } from "../book-management/models/books.model";
+import { Database } from "../../db/db";
 
-const books: IBook[] = [];
-
-/**
- * Class representing a repository for managing books.
- * Implements the IRepository interface for book-related operations.
- */
 export class BookRepository implements IRepository<IBookBase, IBook> {
+  private readonly books: IBook[];
+
+  constructor(private readonly db: Database<{ books: IBook[] }>) {
+    this.books = this.db.table("books");
+  }
+
   /**
    * Creates a new book and adds it to the repository.
    * @param {IBookBase} data - The base data for the book to be created.
-   * @returns {IBook} The created book with assigned ID and available number of copies.
+   * @returns {Promise<IBook>} The created book with assigned ID and available number of copies.
    */
-  create(data: IBookBase): IBook {
+  async create(data: IBookBase): Promise<IBook> {
     const book: IBook = {
       // TODO: Implement validation
       ...data,
-      id: books.length + 1,
+      id: this.books.length + 1,
       availableNumberOfCopies: data.totalNumberOfCopies,
     };
-    books.push(book);
+    this.books.push(book);
+    await this.db.save();
     return book;
   }
 
@@ -29,33 +31,34 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
    * Updates an existing book in the repository.
    * @param {number} id - The ID of the book to update.
    * @param {IBook} data - The new data for the book.
-   * @returns {IBook | null} The updated book or null if the book was not found.
+   * @returns {Promise<IBook | null>} The updated book or null if the book was not found.
    */
-  update(id: number, data: IBook): IBook | null {
-    const index = books.findIndex((b) => b.id === id);
+  async update(id: number, data: IBook): Promise<IBook | null> {
+    const index = this.books.findIndex((b) => b.id === id);
     if (index === -1) {
       return null;
     }
     const updatedBook: IBook = {
-      ...books[index],
+      ...this.books[index],
       ...data,
     };
-    books[index] = updatedBook;
+    this.books[index] = updatedBook;
+    await this.db.save();
     return updatedBook;
   }
 
   /**
    * Deletes a book from the repository.
    * @param {number} id - The ID of the book to delete.
-   * @returns {IBook | null} The deleted book or null if the book was not found.
+   * @returns {Promise<IBook | null>} The deleted book or null if the book was not found.
    */
-  delete(id: number): IBook | null {
-    const index = books.findIndex((b) => b.id === id);
-    console.log(index)
+  async delete(id: number): Promise<IBook | null> {
+    const index = this.books.findIndex((b) => b.id === id);
     if (index === -1) {
       return null;
     }
-    const deletedBook = books.splice(index, 1)[0];
+    const deletedBook = this.books.splice(index, 1)[0];
+    await this.db.save();
     return deletedBook;
   }
 
@@ -65,7 +68,7 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
    * @returns {IBook | null} The book with the specified ID or null if not found.
    */
   getById(id: number): IBook | null {
-    const book = books.find((b) => b.id === id);
+    const book = this.books.find((b) => b.id === id);
     return book || null;
   }
 
@@ -77,18 +80,28 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
   list(params: IPageRequest): IPagedResponse<IBook> {
     const search = params.search?.toLocaleLowerCase();
     const filteredBooks = search
-      ? books.filter(
+      ? this.books.filter(
           (b) =>
             b.title.toLocaleLowerCase().includes(search) ||
             b.isbnNo.toLocaleLowerCase().includes(search)
         )
-      : books;
+      : this.books;
+
+    const items = filteredBooks.slice(
+      params.offset,
+      params.limit + params.offset
+    );
+    const hasNext = params.offset + params.limit < filteredBooks.length;
+    const hasPrevious = params.offset > 0;
+
     return {
-      items: filteredBooks.slice(params.offset, params.limit + params.offset),
+      items,
       pagination: {
         offset: params.offset,
         limit: params.limit,
         total: filteredBooks.length,
+        hasNext,
+        hasPrevious,
       },
     };
   }
