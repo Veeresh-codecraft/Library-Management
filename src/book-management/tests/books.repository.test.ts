@@ -34,7 +34,6 @@ describe("BookRepository", () => {
 
   test("should create 100 books", () => {
     const books = createMultipleBooks(100);
-
     expect(books.length).toBe(100);
     books.forEach((book, index) => {
       expect(book.id).toBe(index + 1);
