@@ -9,7 +9,12 @@
   "author": "Veersh , Nagaraj, Vedanth",
   "license": "ISC",
   "devDependencies": {
+    "@faker-js/faker": "^8.4.1",
+    "@types/faker": "^6.6.9",
+    "@types/jest": "^29.5.12",
     "@types/node": "^20.14.9",
+    "faker": "^5.5.3",
+    "jest": "^29.7.0",
     "typescript": "^5.5.3",
     "vitest": "^1.6.0"
   },
