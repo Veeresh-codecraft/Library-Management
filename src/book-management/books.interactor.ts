@@ -170,7 +170,7 @@ async function showPaginatedBooks(repo: BookRepository): Promise<void> {
     console.clear();
     console.table(response.items);
     console.log(
-      "Press '→' for next page, '←' for previous page, or 'q' to quit."
+      "Press '←' for next page, '→' for previous page, or 'q' to quit."
     );
   };
 
