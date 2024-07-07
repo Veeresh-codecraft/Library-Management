@@ -1,7 +1,7 @@
-import { IPageRequest, IPagedResponse } from "../../core/pagination";
+import { IPageRequest, IPagedResponse } from "../../core/pagination.model";
 import { IRepository } from "../../core/repository";
 import { IUser, IUserBase } from "./models/user.model";
-import { Database } from "../../db/db";
+import { Database } from "../../db/userDb";
 
 /**
  * Class representing a user repository.
@@ -44,7 +44,10 @@ export class UserRepository implements IRepository<IUserBase, IUser> {
    * @param {IUserBase} updatedData - The updated user data.
    * @returns {IUser | null} The updated user or null if not found.
    */
-  update(UIdToUpdate: number, updatedData: IUserBase): IUser | null {
+  async update(
+    UIdToUpdate: number,
+    updatedData: IUserBase
+  ): Promise<IUser | null> {
     const user: IUser = this.getById(UIdToUpdate)!;
     if (updatedData.name != "") {
       user.name = updatedData.name;
@@ -71,7 +74,7 @@ export class UserRepository implements IRepository<IUserBase, IUser> {
    * @param {number} id - The ID of the user to delete.
    * @returns {IUser | null} The deleted user or null if not found.
    */
-  delete(id: number): IUser | null {
+  async delete(id: number): Promise<IUser | null> {
     const userToDelete = this.getById(id);
     const index = this.users.findIndex((user) => user.UId === id);
     this.users.splice(index, 1);
