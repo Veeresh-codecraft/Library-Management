@@ -19,6 +19,8 @@
     "vitest": "^1.6.0"
   },
   "dependencies": {
-    "chalk": "^4.1.2"
+    "chalk": "^4.1.2",
+    "date-and-time": "^3.3.0",
+    "zod": "^3.23.8"
   }
 }
