@@ -1,34 +1,38 @@
-//comment yet to updated
-import "dotenv/config";
 import mysql from "mysql2/promise";
-
-interface DBConfig {
+import { ColumnData } from "./db";
+export interface DBConfig {
   dbURL: string;
 }
 
-class MySQLAdapter {
-  private pool: mysql.Pool | null = null;
-  private connection: mysql.PoolConnection | null = null;
-  constructor(private readonly config: DBConfig) {}
-  async load() {
-    this.pool = await mysql.createPool(this.config.dbURL);
-    this.connection = await this.pool.getConnection();
+interface Adapter {
+  shutDown: () => Promise<void>;
+  runQuery: <T>(sql: string, values: ColumnData[]) => Promise<T | undefined>;
+}
+
+export class MySQLAdapter implements Adapter {
+  private pool: mysql.Pool;
+  constructor(private readonly config: DBConfig) {
+    this.pool = mysql.createPool(this.config.dbURL);
   }
 
   async shutDown() {
-    this.connection?.release();
-    this.pool?.end();
-    this.pool = null;
-    this.connection = null;
+    return this.pool.end();
   }
-  async runQuery(sql: string): Promise<mysql.QueryResult> {
-    if (this.connection) {
-      const [result] = await this.connection?.query(sql);
-      return result as mysql.QueryResult;
-    } else {
-      throw new Error("database connection is unsuccessful");
+
+  async runQuery<T>(sql: string, values: ColumnData[]): Promise<T | undefined> {
+    let connection: mysql.PoolConnection | null = null;
+    try {
+      connection = await this.pool.getConnection();
+      const [result] = await connection.query(sql, values);
+      return result as T;
+    } catch (err) {
+      if (err instanceof Error) {
+        throw new Error(err.message);
+      }
+    } finally {
+      if (connection) {
+        this.pool.releaseConnection(connection);
+      }
     }
   }
 }
-
-export { MySQLAdapter, DBConfig };

@@ -6,6 +6,7 @@ import { Menu } from "../../core/menu";
 import { getEditableInput } from "../../core/print.utils";
 import { Database } from "../../db/db";
 import * as readline from "readline";
+import { resolve } from "path";
 const menu = new Menu("Book Management", [
   { key: "1", label: "Add Book" },
   { key: "2", label: "Edit Book" },
@@ -50,15 +51,12 @@ export class BookInteractor implements IInteractor {
         }
       } else {
         console.log("\nInvalid input\n\n");
-
       }
     }
   }
 }
 
 async function getBookInput(): Promise<IBookBase> {
-
-
   const title = await readLine(`Please enter title:`);
   const author = await readLine(`Please enter author:`);
   const publisher = await readLine(`Please enter publisher:`);
@@ -73,7 +71,7 @@ async function getBookInput(): Promise<IBookBase> {
     title: title,
     author: author,
     publisher: publisher,
-    genre: [genre],
+    genre: genre,
     isbnNo: isbnNo,
     numofPages: numofPages,
     totalNumberOfCopies: totalNumberOfCopies,
@@ -83,10 +81,10 @@ async function getBookInput(): Promise<IBookBase> {
 async function addBook(repo: BookRepository) {
   const book: IBookBase = await getBookInput();
   const createdBook = await repo.create(book);
+  console.log(createdBook);
   console.log("Book added successfully\nBook Id:");
   console.table(createdBook);
 }
-
 
 async function updateBook(repo: BookRepository) {
   const id = +(await readLine("Please enter the ID of the book to update:"));
@@ -101,9 +99,7 @@ async function updateBook(repo: BookRepository) {
     "Please updated publisher: ",
     book.publisher
   );
-  book.genre = (
-    await getEditableInput("Please updated genre: ", book.genre.join(" "))
-  ).split(" ");
+  book.genre = await getEditableInput("Please updated genre: ", book.genre);
   book.isbnNo = await getEditableInput("Please updated ISBN.NO: ", book.isbnNo);
   book.numofPages = +(await getEditableInput(
     "Please updated number of pages: ",
@@ -169,6 +165,13 @@ async function showPaginatedBooks(repo: BookRepository): Promise<void> {
     const response = repo.list({ limit, offset });
     console.clear();
     console.table(response.items);
+    // console.log(
+    //   "[" +
+    //     "=".repeat(offset + limit - 2) +
+    //     "=>" +
+    //     " ".repeat(40 - offset + limit) +
+    //     "]"
+    // );
     console.log(
       "Press '←' for next page, '→' for previous page, or 'q' to quit."
     );
@@ -187,4 +190,3 @@ async function showPaginatedBooks(repo: BookRepository): Promise<void> {
   }
   process.stdin.resume();
 }
-

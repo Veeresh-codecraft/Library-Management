@@ -2,6 +2,7 @@ import { IPageRequest, IPagedResponse } from "../../core/pagination.model";
 import { IRepository } from "../../core/repository";
 import { IBookBase, IBook } from "../book-management/models/books.model";
 import { Database } from "../../db/db";
+import { totalmem } from "os";
 
 export class BookRepository implements IRepository<IBookBase, IBook> {
   private readonly books: IBook[];
@@ -86,7 +87,7 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
             b.isbnNo.toLocaleLowerCase().includes(search)
         )
       : this.books;
-
+    const totLen = filteredBooks.length;
     const items = filteredBooks.slice(
       params.offset,
       params.limit + params.offset
@@ -102,6 +103,7 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
         total: filteredBooks.length,
         hasNext,
         hasPrevious,
+
       },
     };
   }

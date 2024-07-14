@@ -10,82 +10,69 @@ import {
 
 const generateWhereClauseSql = <Model>(
   whereParams: WhereExpression<Model>
-): string => {
-  const processSimpleExp = (exp: SimpleWhereExpression<Model>) => {
+): [string, any[]] => {
+  let whereValues: any[] = [];
+
+  const processSimpleExp = (exp: SimpleWhereExpression<Model>): string => {
     const whereQuery = Object.entries(exp)
       .map(([key, opts]) => {
         const columnName = `\`${key}\``;
         const paramValue: WhereParamValue = opts as WhereParamValue;
-        let value = `${paramValue.value}`;
+        let value = paramValue.value;
         let operator = "";
+
         if (paramValue.value === null) {
-          if (paramValue.op === "EQUALS") {
-            operator = " IS ";
-          } else {
-            operator = " IS NOT ";
-          }
+          operator = paramValue.op === "EQUALS" ? " IS " : " IS NOT ";
         } else {
           switch (paramValue.op) {
             case "EQUALS":
               operator = " = ";
               break;
-
             case "NOT_EQUALS":
               operator = " != ";
               break;
-
             case "STARTS_WITH":
               operator = " LIKE ";
               value = `${value}%`;
               break;
-
             case "NOT_STARTS_WITH":
               operator = " NOT LIKE ";
               value = `${value}%`;
               break;
-
             case "ENDS_WITH":
               operator = " LIKE ";
               value = `%${value}`;
               break;
-
             case "NOT_ENDS_WITH":
               operator = " NOT LIKE ";
               value = `%${value}`;
               break;
-
             case "CONTAINS":
               operator = " LIKE ";
               value = `%${value}%`;
               break;
-
             case "NOT_CONTAINS":
               operator = " NOT LIKE ";
               value = `%${value}%`;
               break;
-
             case "GREATER_THAN":
               operator = " > ";
               break;
-
             case "GREATER_THAN_EQUALS":
               operator = " >= ";
               break;
-
             case "LESSER_THAN":
               operator = " < ";
               break;
-
             case "LESSER_THAN_EQUALS":
               operator = " <= ";
               break;
+            
           }
         }
 
-        if (typeof paramValue.value === "string") {
-          value = `"${value}"`;
-        }
-        return `${columnName} ${operator} ${value}`;
+        whereValues.push(paramValue.value);
+        return `${columnName} ${operator} ?`;
       })
       .join(" AND ");
     return whereQuery;
@@ -93,88 +80,118 @@ const generateWhereClauseSql = <Model>(
 
   const whKeys = Object.keys(whereParams);
 
+  let whereClause = "";
+
   if (whKeys.includes("AND")) {
-    //it's an AndWhereExpression
-    const andClause = (whereParams as AndWhereExpression<Model>).AND.map(
-      (exp) => generateWhereClauseSql(exp)
+    // it's an AndWhereExpression
+    const andClauses = (whereParams as AndWhereExpression<Model>).AND.map(
+      (exp) => {
+        const [clause, values] = generateWhereClauseSql(exp);
+        whereValues.push(...values);
+        return clause;
+      }
     )
       .filter((c) => c)
       .join(" AND ");
-    return andClause ? `(${andClause})` : "";
+    whereClause = andClauses ? `(${andClauses})` : "";
   } else if (whKeys.includes("OR")) {
-    //it's an OrWhereExpression
-    const orClause = (whereParams as OrWhereExpression<Model>).OR.map((exp) =>
-      generateWhereClauseSql(exp)
+    // it's an OrWhereExpression
+    const orClauses = (whereParams as OrWhereExpression<Model>).OR.map(
+      (exp) => {
+        const [clause, values] = generateWhereClauseSql(exp);
+        whereValues.push(...values);
+        return clause;
+      }
     )
       .filter((c) => c)
       .join(" OR ");
-    return orClause ? `(${orClause})` : "";
+    whereClause = orClauses ? `(${orClauses})` : "";
   } else {
-    //it's a SimpleWhereExpression
+    // it's a SimpleWhereExpression
     const simpleClause = processSimpleExp(
       whereParams as SimpleWhereExpression<Model>
     );
-    return simpleClause ? `(${simpleClause})` : "";
+    whereClause = simpleClause ? `(${simpleClause})` : "";
   }
+
+  return [whereClause, whereValues];
 };
+interface Query{
+  sqlQuery: string; values: any[] 
+}
+const generateInsertSql = <Model extends { [key: string]: any }>(
+  tableName: string,
+  rows: Model[]
+): Query => {
+  if (rows.length === 0) {
+    throw new Error("Rows array cannot be empty");
+  }
 
-const generateInsertSql = <Model>(tableName: string, row: Model): string => {
   let columns = "";
-  let values = "";
+  let placeholders = "";
+  let values: Array<any> = [];
 
-  Object.entries(row as object).forEach(([key, value]) => {
-    if (columns) columns += ", ";
-    columns += `\`${key}\``;
-
-    if (values) values += ", ";
-    if (typeof value === "string") {
-      values += `"${value}"`;
-    } else {
-      values += `${value}`;
+  Object.entries(rows[0]).forEach(([key], index) => {
+    if (columns) {
+      columns += ", ";
+      placeholders += ", ";
     }
+    columns += `\`${key}\``;
+    placeholders += "?";
   });
 
-  let sql = `INSERT INTO ${tableName} (${columns}) VALUES (${values})`;
+  const rowPlaceholders = `(${placeholders})`;
+  const allPlaceholders = rows.map(() => rowPlaceholders).join(", ");
+  values = rows.flatMap((row) =>
+    Object.values(row).map((value) =>
+      typeof value === "string" ? `${value}` : value
+    )
+  );
 
-  return sql;
+  const sqlQuery = `INSERT INTO \`${tableName}\` (${columns}) VALUES ${allPlaceholders}`;
+  return { sqlQuery, values };
 };
 
 const generateUpdateSql = <Model>(
   tableName: string,
-  row: Partial<Model>,
+  row: Array<Partial<Model>>,
   where: WhereExpression<Model>
-): string => {
-  const setClause = Object.entries(row as object)
+): Query => {
+  let updateValues: ColumnData[] = [];
+  const setClause = Object.entries(row[0] as object)
     .map(([key, value]: [string, ColumnData]) => {
       const columnName = `\`${key}\``;
-      let formattedValue =
-        typeof value === "string" ? `"${value}"` : `${value}`;
-      return `${columnName} = ${formattedValue}`;
+      let formattedValue = typeof value === "string" ? `${value}` : value;
+      updateValues.push(formattedValue);
+      return `${columnName} = ?`;
     })
     .join(", ");
 
-  const whereClause = generateWhereClauseSql<Model>(where);
-
-  let sql = `UPDATE ${tableName} SET ${setClause} WHERE ${whereClause}`;
-
-  return sql;
+  const [whereClause, whereValues] = generateWhereClauseSql<Model>(where);
+  const values = updateValues.concat(whereValues);
+  let sqlQuery = `UPDATE ${tableName} SET ${setClause} WHERE ${whereClause}`;
+  return { sqlQuery, values };
 };
 
 const generateDeleteSql = <Model>(
   tableName: string,
   where: WhereExpression<Model>
-): string => {
-  const whereClause = generateWhereClauseSql<Model>(where);
+): Query => {
+  const [whereClause, values] = generateWhereClauseSql<Model>(where);
 
-  let sql = `DELETE FROM ${tableName} WHERE ${whereClause}`;
+  let sqlQuery = `DELETE FROM ${tableName} WHERE ${whereClause}`;
 
-  return sql;
+  return { sqlQuery, values };
 };
 
-function sanitiesedField(field: string) {
-  let fieldWithBacktick = field.startsWith("`") ? field : "`" + field;
-  fieldWithBacktick = field.endsWith("`") ? field : "`" + field;
-  return fieldWithBacktick;
+function sanitisedField(field: string): string {
+  if (!field.startsWith("`")) {
+    field = "`" + field;
+  }
+  if (!field.endsWith("`")) {
+    field = field + "`";
+  }
+  return field;
 }
 
 const generateSelectSql = <Model>(
@@ -185,12 +202,12 @@ const generateSelectSql = <Model>(
   limit: number
 ): string => {
   const sanitiesedFields = fieldsToSelect.map((field) => {
-    sanitiesedField(field as string);
+    sanitisedField(field as string);
   });
   const selectClause = sanitiesedFields.length
     ? sanitiesedFields.join(", ")
     : "*";
-  //const selectClause = fieldsToSelect.length ? fieldsToSelect.join(", ") : "*";
+  // const selectClause = fieldsToSelect.length ? fieldsToSelect.join(", ") : "*";
   const whereClause = generateWhereClauseSql<Model>(where);
 
   let sql = `SELECT ${selectClause} FROM ${tableName}`;
@@ -214,6 +231,15 @@ const generateCountSql = <Model>(
 };
 
 export const MySqlQueryGenerator = {
+  generateWhereClauseSql,
+  generateInsertSql,
+  generateUpdateSql,
+  generateDeleteSql,
+  generateSelectSql,
+  generateCountSql,
+};
+
+export {
   generateWhereClauseSql,
   generateInsertSql,
   generateUpdateSql,

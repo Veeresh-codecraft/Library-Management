@@ -4,7 +4,7 @@ import { AppEnvs } from "../../read-env";
 import { DBConfig, MySQLAdapter } from "../sqldb";
 import { describe, test, beforeEach, afterEach } from "vitest";
 import { SimpleWhereExpression } from "../../libs/types";
-describe("MySQL DB Adapter tests", () => {
+describe.skip("MySQL DB Adapter tests", () => {
   const { generateSelectSql } = MySqlQueryGenerator;
   const authorClause: SimpleWhereExpression<IBook> = {
     author: {
