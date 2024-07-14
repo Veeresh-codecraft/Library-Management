@@ -37,22 +37,22 @@ describe("tests of functionality of execution of middle layer", () => {
 
   // test("test to update books table", async () => {
   //   const updateData = [{ title: "fun coding", author: "veda" }];
-  //   const whereParams: OrWhereExpression<IBook> = {
-  //     OR: [
-  //       {
-  //         publisher: {
-  //           op: "EQUALS",
-  //           value: "Tech Books Publishing",
-  //         },
+  // const whereParams: OrWhereExpression<IBook> = {
+  //   OR: [
+  //     {
+  //       publisher: {
+  //         op: "EQUALS",
+  //         value: "Tech Books Publishing",
   //       },
-  //       {
-  //         totalNumberOfCopies: {
-  //           op: "GREATER_THAN_EQUALS",
-  //           value: 200,
-  //         },
+  //     },
+  //     {
+  //       totalNumberOfCopies: {
+  //         op: "GREATER_THAN_EQUALS",
+  //         value: 200,
   //       },
-  //     ],
-  //   };
+  //     },
+  //   ],
+  // };
 
   //   const result = await handleDatabaseOperation<IBook>("UPDATE", {
   //     tableName: "books",
@@ -64,26 +64,39 @@ describe("tests of functionality of execution of middle layer", () => {
   //   //expect(result.affectedRows).toBeGreaterThan(0);
   // });
 
-  // test("test to select from books table", async () => {
-  //   const whereParams: SimpleWhereExpression<IBook> = {
-  //     id: { op: "EQUALS", value: 1 },
-  //   };
+  test("test to select from books table", async () => {
+    // const whereParams: SimpleWhereExpression<IBook> = {
+    //   id: { op: "EQUALS", value: 9 },
+    // };
 
-  //   const result = await handleDatabaseOperation<IBook>("SELECT", {
-  //     tableName: "books",
-  //     fieldsToSelect: ["title", "author"],
-  //     where: whereParams,
-  //     offset: 0,
-  //     limit: 5,
-  //   });
+    const result = await handleDatabaseOperation<IBook>("SELECT", {
+      tableName: "books ",
+      fieldsToSelect: [],
+      //where: whereParams,
+      offset: 0,
+      limit: 5,
+    });
 
-  //   console.log(result);
-  //   expect(result).toBeDefined();
-  // });
+    console.log(result);
+    expect(result).toBeDefined();
+  });
 
   // test("test to count rows in books table", async () => {
-  //   const whereParams: SimpleWhereExpression<IBook> = {
-  //     id: { op: "EQUALS", value: 1 },
+  //   const whereParams: OrWhereExpression<IBook> = {
+  //     OR: [
+  //       {
+  //         publisher: {
+  //           op: "EQUALS",
+  //           value: "Tech Books Publishing",
+  //         },
+  //       },
+  //       {
+  //         totalNumberOfCopies: {
+  //           op: "GREATER_THAN_EQUALS",
+  //           value: 15,
+  //         },
+  //       },
+  //     ],
   //   };
 
   //   const result = await handleDatabaseOperation<IBook>("COUNT", {
@@ -95,14 +108,14 @@ describe("tests of functionality of execution of middle layer", () => {
   //   expect(result).toBeDefined();
   //   //expect(result[0].count).toBeGreaterThanOrEqual(0);
   // });
-  test("test to delete a book",async  () => {
-    const whereParams: SimpleWhereExpression<IBook> = {
-      id: { op: "EQUALS", value: 8 },
-    };
-    const result = await handleDatabaseOperation("DELETE", {
-      tableName: "books",
-      where: whereParams,
-    });
-    console.log(result)
-  });
+  // test("test to delete a book",async  () => {
+  //   const whereParams: SimpleWhereExpression<IBook> = {
+  //     id: { op: "EQUALS", value: 8 },
+  //   };
+  //   const result = await handleDatabaseOperation("DELETE", {
+  //     tableName: "books",
+  //     where: whereParams,
+  //   });
+  //   console.log(result)
+  // });
 });

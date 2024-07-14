@@ -7,6 +7,7 @@ import { getEditableInput } from "../../core/print.utils";
 import { Database } from "../../db/db";
 import * as readline from "readline";
 import { resolve } from "path";
+import { handleDatabaseOperation } from "../diLayer";
 const menu = new Menu("Book Management", [
   { key: "1", label: "Add Book" },
   { key: "2", label: "Edit Book" },
@@ -80,7 +81,12 @@ async function getBookInput(): Promise<IBookBase> {
 
 async function addBook(repo: BookRepository) {
   const book: IBookBase = await getBookInput();
+
   const createdBook = await repo.create(book);
+  handleDatabaseOperation("INSERT", {
+    tableName: "books",
+    data: [createdBook],
+  });
   console.log(createdBook);
   console.log("Book added successfully\nBook Id:");
   console.table(createdBook);
@@ -165,6 +171,7 @@ async function showPaginatedBooks(repo: BookRepository): Promise<void> {
     const response = repo.list({ limit, offset });
     console.clear();
     console.table(response.items);
+    //TODO: progress bar
     // console.log(
     //   "[" +
     //     "=".repeat(offset + limit - 2) +

@@ -67,7 +67,6 @@ const generateWhereClauseSql = <Model>(
             case "LESSER_THAN_EQUALS":
               operator = " <= ";
               break;
-            
           }
         }
 
@@ -116,8 +115,9 @@ const generateWhereClauseSql = <Model>(
 
   return [whereClause, whereValues];
 };
-interface Query{
-  sqlQuery: string; values: any[] 
+interface Query {
+  sqlQuery: string;
+  values: any[];
 }
 const generateInsertSql = <Model extends { [key: string]: any }>(
   tableName: string,
@@ -147,7 +147,6 @@ const generateInsertSql = <Model extends { [key: string]: any }>(
       typeof value === "string" ? `${value}` : value
     )
   );
-
   const sqlQuery = `INSERT INTO \`${tableName}\` (${columns}) VALUES ${allPlaceholders}`;
   return { sqlQuery, values };
 };
@@ -184,15 +183,15 @@ const generateDeleteSql = <Model>(
   return { sqlQuery, values };
 };
 
-function sanitisedField(field: string): string {
-  if (!field.startsWith("`")) {
-    field = "`" + field;
-  }
-  if (!field.endsWith("`")) {
-    field = field + "`";
-  }
-  return field;
-}
+// function sanitisedField(field: string): string {
+//   if (!field.startsWith("`")) {
+//     field = "`" + field;
+//   }
+//   if (!field.endsWith("`")) {
+//     field = field + "`";
+//   }
+//   return field;
+// }
 
 const generateSelectSql = <Model>(
   tableName: string,
@@ -200,34 +199,36 @@ const generateSelectSql = <Model>(
   where: WhereExpression<Model>,
   offset: number,
   limit: number
-): string => {
-  const sanitiesedFields = fieldsToSelect.map((field) => {
-    sanitisedField(field as string);
-  });
-  const selectClause = sanitiesedFields.length
-    ? sanitiesedFields.join(", ")
-    : "*";
-  // const selectClause = fieldsToSelect.length ? fieldsToSelect.join(", ") : "*";
-  const whereClause = generateWhereClauseSql<Model>(where);
+): Query => {
+  // const sanitiesedFields = fieldsToSelect.map((field) => {
+  //   sanitisedField(field as string);
+  // });
+  // const selectClause = sanitiesedFields.length
+  //   ? sanitiesedFields.join(", ")
+  //   : "*";
+  const selectClause = fieldsToSelect.length ? fieldsToSelect.join(", ") : "*";
+  const [whereClause, values] = generateWhereClauseSql<Model>(where);
 
-  let sql = `SELECT ${selectClause} FROM ${tableName}`;
-  sql += whereClause ? ` WHERE ${whereClause} ` : "";
-  sql += `LIMIT ${limit} OFFSET ${offset}`;
+  let sqlQuery = `SELECT ${selectClause} FROM ${tableName}`;
+  sqlQuery += whereClause ? ` WHERE ${whereClause} ` : "";
+  sqlQuery += `LIMIT ${limit} OFFSET ${offset}`;
 
-  return sql;
+  return { sqlQuery, values };
 };
 
 const generateCountSql = <Model>(
   tableName: string,
   where?: WhereExpression<Model>
-): string => {
-  const whereClause = where ? `${generateWhereClauseSql<Model>(where)}` : "";
-
-  let sql = `
-    SELECT COUNT(*) AS \`count\` FROM ${tableName} ${whereClause}
+): Query => {
+  let [whereClause, values] = ["", [""]];
+  if (where) {
+    [whereClause, values] = generateWhereClauseSql<Model>(where);
+  }
+  let sqlQuery = `
+    SELECT COUNT(*) AS \`count\` FROM ${tableName} WHERE ${whereClause}
     `;
 
-  return sql;
+  return { sqlQuery, values };
 };
 
 export const MySqlQueryGenerator = {

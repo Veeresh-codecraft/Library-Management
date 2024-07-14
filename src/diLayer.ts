@@ -16,7 +16,7 @@ import {
 
 import { AppEnvs } from "../read-env";
 import { DBConfig, MySQLAdapter } from "../db/sqldb";
-import { QueryResult } from "mysql2";
+
 import { ColumnData } from "../db/db";
 
 // Define database configuration
@@ -50,8 +50,7 @@ export const handleDatabaseOperation = async <Model>(
 ): Promise<string | undefined> => {
   let sqlQuery = "";
   let values: ColumnData[] = []; // Initialize values as an empty array
-  let whereClause:[string, any[]];
-
+  let whereClause: [string, any[]];
   if (params.where) {
     whereClause = generateWhereClauseSql(params.where);
   }
@@ -80,38 +79,39 @@ export const handleDatabaseOperation = async <Model>(
       }
       break;
     case "DELETE":
-      const result = generateDeleteSql(
+      const result1 = generateDeleteSql(
         params.tableName,
         params.where || ({} as WhereExpression<Model>)
       );
-      sqlQuery = result.sqlQuery;
-      values = result.values;
+      sqlQuery = result1.sqlQuery;
+      values = result1.values;
       break;
-    // case "SELECT":
-    //   if (params.fieldsToSelect && params.fieldsToSelect.length > 0) {
-    //     const result = generateSelectSql(
-    //       params.tableName,
-    //       params.fieldsToSelect,
-    //       params.where || ({} as WhereExpression<Model>),
-    //       params.offset || 0,
-    //       params.limit || 10
-    //     );
-    //     sql = result.sql;
-    //     values = result.values;
-    //   } else {
-    //     throw new Error(
-    //       "SELECT operation requires at least one field to select"
-    //     );
-    //   }
-    //   break;
-    // case "COUNT":
-    //   const result2 = generateCountSql(
-    //     params.tableName,
-    //     params.where || ({} as WhereExpression<Model>)
-    //   );
-    //   sql = result2.sql;
-    //   values = result2.values;
-    //   break;
+    case "SELECT":
+      if (params.fieldsToSelect) {
+        const result2 = generateSelectSql(
+          params.tableName,
+          params.fieldsToSelect,
+          params.where || ({} as WhereExpression<Model>),
+          params.offset || 0,
+          params.limit || 10
+        );
+        sqlQuery = result2.sqlQuery;
+        values = result2.values;
+        //console.log(sqlQuery,values)
+      } else {
+        throw new Error(
+          "SELECT operation requires at least one field to select"
+        );
+      }
+      break;
+    case "COUNT":
+      const result3 = generateCountSql(
+        params.tableName,
+        params.where || ({} as WhereExpression<Model>)
+      );
+      sqlQuery = result3.sqlQuery;
+      values = result3.values;
+      break;
     default:
       throw new Error("Invalid operation type");
   }

@@ -3,7 +3,7 @@ import { IRepository } from "../../core/repository";
 import { IBookBase, IBook } from "../book-management/models/books.model";
 import { Database } from "../../db/db";
 import { totalmem } from "os";
-
+import { handleDatabaseOperation } from "../diLayer";
 export class BookRepository implements IRepository<IBookBase, IBook> {
   private readonly books: IBook[];
 
@@ -25,6 +25,7 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
     };
     this.books.push(book);
     await this.db.save();
+
     return book;
   }
 
@@ -103,7 +104,6 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
         total: filteredBooks.length,
         hasNext,
         hasPrevious,
-
       },
     };
   }
