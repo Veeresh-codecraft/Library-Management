@@ -32,6 +32,7 @@ describe("tests of functionality of execution of middle layer", () => {
   //     tableName: "books",
   //     data: bookData,
   //   });
+  //   console.log(result);
   //   expect(result).toBeDefined();
   // });
 
@@ -64,50 +65,50 @@ describe("tests of functionality of execution of middle layer", () => {
   //   //expect(result.affectedRows).toBeGreaterThan(0);
   // });
 
-  test("test to select from books table", async () => {
+  // test("test to select from books table", async () => {
     // const whereParams: SimpleWhereExpression<IBook> = {
     //   id: { op: "EQUALS", value: 9 },
     // };
 
-    const result = await handleDatabaseOperation<IBook>("SELECT", {
-      tableName: "books ",
-      fieldsToSelect: [],
-      //where: whereParams,
-      offset: 0,
-      limit: 5,
+    // const result = await handleDatabaseOperation<IBook>("SELECT", {
+    //   tableName: "books ",
+    //   fieldsToSelect: [],
+    //   //where: whereParams,
+    //   offset: 0,
+    //   limit: 5,
+    // });
+
+  //   console.log(result);
+  //   expect(result).toBeDefined();
+  // });
+
+  test("test to count rows in books table", async () => {
+    const whereParams: OrWhereExpression<IBook> = {
+      OR: [
+        {
+          publisher: {
+            op: "NOT_EQUALS",
+            value: "Tech Books Publishing",
+          },
+        },
+        {
+          totalNumberOfCopies: {
+            op: "GREATER_THAN_EQUALS",
+            value: 15,
+          },
+        },
+      ],
+    };
+
+    const result = await handleDatabaseOperation<IBook>("COUNT", {
+      tableName: "books",
+      where: whereParams,
     });
 
     console.log(result);
     expect(result).toBeDefined();
+    //expect(result[0].count).toBeGreaterThanOrEqual(0);
   });
-
-  // test("test to count rows in books table", async () => {
-  //   const whereParams: OrWhereExpression<IBook> = {
-  //     OR: [
-  //       {
-  //         publisher: {
-  //           op: "EQUALS",
-  //           value: "Tech Books Publishing",
-  //         },
-  //       },
-  //       {
-  //         totalNumberOfCopies: {
-  //           op: "GREATER_THAN_EQUALS",
-  //           value: 15,
-  //         },
-  //       },
-  //     ],
-  //   };
-
-  //   const result = await handleDatabaseOperation<IBook>("COUNT", {
-  //     tableName: "books",
-  //     where: whereParams,
-  //   });
-
-  //   console.log(result);
-  //   expect(result).toBeDefined();
-  //   //expect(result[0].count).toBeGreaterThanOrEqual(0);
-  // });
   // test("test to delete a book",async  () => {
   //   const whereParams: SimpleWhereExpression<IBook> = {
   //     id: { op: "EQUALS", value: 8 },

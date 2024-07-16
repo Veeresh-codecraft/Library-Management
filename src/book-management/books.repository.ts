@@ -2,7 +2,6 @@ import { IPageRequest, IPagedResponse } from "../../core/pagination.model";
 import { IRepository } from "../../core/repository";
 import { IBookBase, IBook } from "../book-management/models/books.model";
 import { Database } from "../../db/db";
-import { totalmem } from "os";
 import { handleDatabaseOperation } from "../diLayer";
 export class BookRepository implements IRepository<IBookBase, IBook> {
   private readonly books: IBook[];
@@ -20,11 +19,9 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
     const book: IBook = {
       // TODO: Implement validation
       ...data,
-      id: this.books.length + 1,
+      id: 0,
       availableNumberOfCopies: data.totalNumberOfCopies,
     };
-    this.books.push(book);
-    await this.db.save();
 
     return book;
   }
@@ -106,5 +103,18 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
         hasPrevious,
       },
     };
+  }
+  async searchByKeyword(keyword: string): Promise<IBook[]> {
+    const result = (await handleDatabaseOperation<IBook>("SELECT", {
+      tableName: "books ",
+      fieldsToSelect: [],
+      //where: whereParams,
+      offset: 0,
+      limit: 1000,
+    })) as IBook[];
+    //const books = await this.list({ limit: 1000, offset: 0 }).items;
+    return result.filter((book) =>
+      book.title.toLowerCase().includes(keyword.toLowerCase())
+    );
   }
 }

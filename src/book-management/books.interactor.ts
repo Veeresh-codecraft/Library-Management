@@ -6,8 +6,9 @@ import { Menu } from "../../core/menu";
 import { getEditableInput } from "../../core/print.utils";
 import { Database } from "../../db/db";
 import * as readline from "readline";
-import { resolve } from "path";
 import { handleDatabaseOperation } from "../diLayer";
+import { QueryResult, ResultSetHeader, RowDataPacket } from "mysql2";
+import { SimpleWhereExpression } from "../../libs/types";
 const menu = new Menu("Book Management", [
   { key: "1", label: "Add Book" },
   { key: "2", label: "Edit Book" },
@@ -38,7 +39,8 @@ export class BookInteractor implements IInteractor {
             await deleteBook(this.repo);
             break;
           case "4":
-            console.table(this.repo.list({ limit: 1000, offset: 0 }).items);
+            await searchByKeyWord(this.repo);
+            //console.table(this.repo.list({ limit: 1000, offset: 0 }).items);
             break;
           case "5":
             await showPaginatedBooks(this.repo);
@@ -83,13 +85,24 @@ async function addBook(repo: BookRepository) {
   const book: IBookBase = await getBookInput();
 
   const createdBook = await repo.create(book);
-  handleDatabaseOperation("INSERT", {
+
+  const result = (await handleDatabaseOperation<IBookBase>("INSERT", {
     tableName: "books",
     data: [createdBook],
-  });
-  console.log(createdBook);
-  console.log("Book added successfully\nBook Id:");
-  console.table(createdBook);
+  })) as ResultSetHeader;
+
+  const insertedBookId = result.insertId;
+  console.clear();
+  console.log(`Book added successfully\nBook Id:${insertedBookId}`);
+  const whereParams: SimpleWhereExpression<IBook> = {
+    id: { op: "EQUALS", value: insertedBookId },
+  };
+  const resultBook = (await handleDatabaseOperation("SELECT", {
+    tableName: "books ",
+    fieldsToSelect: [],
+    where: whereParams,
+  })) as RowDataPacket;
+  console.table(resultBook);
 }
 
 async function updateBook(repo: BookRepository) {
@@ -186,6 +199,84 @@ async function showPaginatedBooks(repo: BookRepository): Promise<void> {
 
   process.stdin.on("keypress", handleKeyPress);
   showPage();
+
+  await new Promise<void>((resolve) => {
+    rl.on("close", resolve);
+  });
+
+  process.stdin.removeListener("keypress", handleKeyPress);
+  if (process.stdin.isTTY) {
+    process.stdin.setRawMode(false);
+  }
+  process.stdin.resume();
+}
+
+async function searchByKeyWord(repo: BookRepository) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    terminal: true,
+  });
+
+  let searchQuery = "";
+  let offset = 0;
+  const limit = 10; // Number of items per page
+  let totalBooks = 0;
+
+  const handleKeyPress = async (
+    chunk: Buffer,
+    key: { name: string; sequence: string }
+  ) => {
+    if (key.sequence === "0") {
+      rl.close();
+      return; // Exit the search
+    } else if (key.sequence === "\b" || key.sequence === "\u007F") {
+      // Handle backspace
+      searchQuery = searchQuery.slice(0, -1);
+      offset = 0; // Reset offset on query change
+    } else if (/^[a-zA-Z0-9 ]$/.test(key.sequence)) {
+      searchQuery += key.sequence;
+      offset = 0; // Reset offset on query change
+    } else if (key.name === "right" && offset + limit < totalBooks) {
+      offset += limit;
+    } else if (key.name === "left" && offset > 0) {
+      offset -= limit;
+    }
+
+    if (searchQuery.length > 0) {
+      const books = await repo.searchByKeyword(searchQuery);
+      totalBooks = books.length;
+      const paginatedBooks = books.slice(offset, offset + limit);
+      console.clear();
+      console.log(`Search results for "${searchQuery}":`);
+      const progress = Math.min(40, Math.floor((offset / totalBooks) * 40));
+      const remaining = 40 - progress;
+      console.log(
+        `[${"=".repeat(progress)}${">".repeat(
+          offset + limit < totalBooks ? 1 : 0
+        )}${" ".repeat(remaining / 2 - 2)}]`
+      );
+      console.log(
+        "Press '←' for previous page, '→' for next page, or '0' to quit."
+      );
+      console.table(paginatedBooks);
+
+      // Display progress bar
+    } else {
+      console.clear();
+      console.log(`Start typing to search...`);
+    }
+  };
+
+  readline.emitKeypressEvents(process.stdin);
+  if (process.stdin.isTTY) {
+    process.stdin.setRawMode(true);
+  }
+
+  process.stdin.on("keypress", handleKeyPress);
+
+  console.clear();
+  console.log(`Start typing to search... (Press '0' to exit)`);
 
   await new Promise<void>((resolve) => {
     rl.on("close", resolve);

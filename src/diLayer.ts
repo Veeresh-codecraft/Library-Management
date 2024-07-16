@@ -18,6 +18,7 @@ import { AppEnvs } from "../read-env";
 import { DBConfig, MySQLAdapter } from "../db/sqldb";
 
 import { ColumnData } from "../db/db";
+import { QueryResult, ResultSetHeader, RowDataPacket } from "mysql2";
 
 // Define database configuration
 const config: DBConfig = {
@@ -47,7 +48,7 @@ interface QueryParams<Model> {
 export const handleDatabaseOperation = async <Model>(
   operation: OperationType,
   params: QueryParams<Model>
-): Promise<string | undefined> => {
+): Promise<ResultSetHeader | string | undefined | RowDataPacket> => {
   let sqlQuery = "";
   let values: ColumnData[] = []; // Initialize values as an empty array
   let whereClause: [string, any[]];
@@ -97,7 +98,6 @@ export const handleDatabaseOperation = async <Model>(
         );
         sqlQuery = result2.sqlQuery;
         values = result2.values;
-        //console.log(sqlQuery,values)
       } else {
         throw new Error(
           "SELECT operation requires at least one field to select"
@@ -116,6 +116,7 @@ export const handleDatabaseOperation = async <Model>(
       throw new Error("Invalid operation type");
   }
   console.log(sqlQuery, values);
-  const result: string | undefined = await db.runQuery(sqlQuery, values);
+  const result: string | undefined | ResultSetHeader | RowDataPacket =
+    await db.runQuery(sqlQuery, values);
   return result;
 };
