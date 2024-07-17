@@ -115,7 +115,7 @@ export const handleDatabaseOperation = async <Model>(
     default:
       throw new Error("Invalid operation type");
   }
-  console.log(sqlQuery, values);
+  //console.log(sqlQuery, values);
   const result: string | undefined | ResultSetHeader | RowDataPacket =
     await db.runQuery(sqlQuery, values);
   return result;

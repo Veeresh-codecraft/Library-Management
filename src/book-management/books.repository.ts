@@ -3,6 +3,9 @@ import { IRepository } from "../../core/repository";
 import { IBookBase, IBook } from "../book-management/models/books.model";
 import { Database } from "../../db/db";
 import { handleDatabaseOperation } from "../diLayer";
+import { SimpleWhereExpression } from "../../libs/types";
+import { error } from "console";
+import { ResultSetHeader, RowDataPacket } from "mysql2";
 export class BookRepository implements IRepository<IBookBase, IBook> {
   private readonly books: IBook[];
 
@@ -33,16 +36,33 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
    * @returns {Promise<IBook | null>} The updated book or null if the book was not found.
    */
   async update(id: number, data: IBook): Promise<IBook | null> {
-    const index = this.books.findIndex((b) => b.id === id);
-    if (index === -1) {
-      return null;
-    }
-    const updatedBook: IBook = {
-      ...this.books[index],
-      ...data,
+    const whereParams: SimpleWhereExpression<IBook> = {
+      id: { op: "EQUALS", value: id },
     };
-    this.books[index] = updatedBook;
-    await this.db.save();
+
+    const result = (await handleDatabaseOperation<IBook>("UPDATE", {
+      tableName: "books",
+      data: [data],
+      where: whereParams,
+    })) as ResultSetHeader;
+    const updatedBook = (await handleDatabaseOperation<IBook>("SELECT", {
+      tableName: "books ",
+      fieldsToSelect: [],
+      where: whereParams,
+    })) as IBook;
+    if (result.affectedRows <= 0) {
+      throw new Error("Update is unsuccessful");
+    }
+    //const index = this.books.findIndex((b) => b.id === id);
+    // if (index === -1) {
+    //   return null;
+    // }
+    // const updatedBook: IBook = {
+    //   ...this.books[index],
+    //   ...data,
+    // };
+    //this.books[index] = updatedBook;
+    //await this.db.save();
     return updatedBook;
   }
 
@@ -52,12 +72,28 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
    * @returns {Promise<IBook | null>} The deleted book or null if the book was not found.
    */
   async delete(id: number): Promise<IBook | null> {
-    const index = this.books.findIndex((b) => b.id === id);
-    if (index === -1) {
-      return null;
+    //const index = this.books.findIndex((b) => b.id === id);
+    const whereParams: SimpleWhereExpression<IBook> = {
+      id: { op: "EQUALS", value: id },
+    };
+
+    const deletedBook = (await handleDatabaseOperation<IBook>("SELECT", {
+      tableName: "books ",
+      fieldsToSelect: [],
+      where: whereParams,
+    })) as IBook;
+    try {
+      const result = (await handleDatabaseOperation("DELETE", {
+        tableName: "books",
+        where: whereParams,
+      })) as ResultSetHeader;
+      if (result.affectedRows === 1) {
+        console.log("Deleted Successfully");
+      }
+    } catch (err) {
+      throw new Error("deletion failed");
     }
-    const deletedBook = this.books.splice(index, 1)[0];
-    await this.db.save();
+    //const deletedBook = this.books.splice(index, 1)[0];
     return deletedBook;
   }
 
@@ -66,9 +102,21 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
    * @param {number} id - The ID of the book to retrieve.
    * @returns {IBook | null} The book with the specified ID or null if not found.
    */
-  getById(id: number): IBook | null {
-    const book = this.books.find((b) => b.id === id);
-    return book || null;
+  async getById(id: number): Promise<IBook | null> {
+    const whereParams: SimpleWhereExpression<IBook> = {
+      id: { op: "EQUALS", value: id },
+    };
+    const book = (await handleDatabaseOperation<IBook>("SELECT", {
+      tableName: "books ",
+      fieldsToSelect: [],
+      where: whereParams,
+    })) as RowDataPacket;
+    if (book) {
+      return book[0] as IBook;
+    } else {
+      return null;
+    }
+    //const book = this.books.find((b) => b.id === id);
   }
 
   /**

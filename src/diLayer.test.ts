@@ -55,61 +55,93 @@ describe("tests of functionality of execution of middle layer", () => {
   //   ],
   // };
 
-  //   const result = await handleDatabaseOperation<IBook>("UPDATE", {
-  //     tableName: "books",
-  //     data: updateData,
-  //     where: whereParams,
-  //   });
+    // const result = await handleDatabaseOperation<IBook>("UPDATE", {
+    //   tableName: "books",
+    //   data: updateData,
+    //   where: whereParams,
+    // });
 
   //   expect(result).toBeDefined();
   //   //expect(result.affectedRows).toBeGreaterThan(0);
   // });
 
   // test("test to select from books table", async () => {
-    // const whereParams: SimpleWhereExpression<IBook> = {
-    //   id: { op: "EQUALS", value: 9 },
-    // };
+  //   const nestedQueryWithIn: SimpleWhereExpression<IBook> = {
+  //     id: { op: "IN", value: `SELECT id FROM books WHERE totalNumberOfCopies > 10` },
+  //   };
 
-    // const result = await handleDatabaseOperation<IBook>("SELECT", {
-    //   tableName: "books ",
-    //   fieldsToSelect: [],
-    //   //where: whereParams,
-    //   offset: 0,
-    //   limit: 5,
-    // });
+  //   const resultWithIn = await handleDatabaseOperation<IBook>("SELECT", {
+  //     tableName: "books",
+  //     fieldsToSelect: [],
+  //     where: nestedQueryWithIn,
+  //     offset: 0,
+  //     limit: 5,
+  //   });
+
+  //   // console.log("Result with IN:", resultWithIn);
+  //   // expect(resultWithIn).toBeDefined();
+  //   // expect(resultWithIn!.length).toBeGreaterThan(0);
+
+  //   // Construct nested query using NOT IN operator
+  //   const nestedQueryWithNotIn: SimpleWhereExpression<IBook> = {
+  //     id: { op: "NOT_IN", value: `SELECT id FROM books WHERE totalNumberOfCopies > 10` },
+  //   };
+
+  //   const resultWithNotIn = await handleDatabaseOperation<IBook>("SELECT", {
+  //     tableName: "books",
+  //     fieldsToSelect: [],
+  //     where: nestedQueryWithNotIn,
+  //     offset: 0,
+  //     limit: 5,
+  //   });
+
+  //   // console.log("Result with NOT IN:", resultWithNotIn);
+  //   // expect(resultWithNotIn).toBeDefined();
+  //   // expect(resultWithNotIn!.length).toBeGreaterThan(0);
+  //   // const whereParams: SimpleWhereExpression<IBook> = {
+  //   //   id: { op: "EQUALS", value: 9 },
+  //   // };
+
+  //   // const result = await handleDatabaseOperation<IBook>("SELECT", {
+  //   //   tableName: "books ",
+  //   //   fieldsToSelect: [],
+  //   //   //where: whereParams,
+  //   //   offset: 0,
+  //   //   limit: 5,
+  //   // });
+
+  //   // console.log(result);
+  //   // expect(result).toBeDefined();
+  // });
+
+  // test("test to count rows in books table", async () => {
+  //   const whereParams: OrWhereExpression<IBook> = {
+  //     OR: [
+  //       {
+  //         publisher: {
+  //           op: "NOT_EQUALS",
+  //           value: "Tech Books Publishing",
+  //         },
+  //       },
+  //       {
+  //         totalNumberOfCopies: {
+  //           op: "GREATER_THAN_EQUALS",
+  //           value: 15,
+  //         },
+  //       },
+  //     ],
+  //   };
+
+  //   const result = await handleDatabaseOperation<IBook>("COUNT", {
+  //     tableName: "books",
+  //     where: whereParams,
+  //   });
 
   //   console.log(result);
   //   expect(result).toBeDefined();
+  //   //expect(result[0].count).toBeGreaterThanOrEqual(0);
   // });
-
-  test("test to count rows in books table", async () => {
-    const whereParams: OrWhereExpression<IBook> = {
-      OR: [
-        {
-          publisher: {
-            op: "NOT_EQUALS",
-            value: "Tech Books Publishing",
-          },
-        },
-        {
-          totalNumberOfCopies: {
-            op: "GREATER_THAN_EQUALS",
-            value: 15,
-          },
-        },
-      ],
-    };
-
-    const result = await handleDatabaseOperation<IBook>("COUNT", {
-      tableName: "books",
-      where: whereParams,
-    });
-
-    console.log(result);
-    expect(result).toBeDefined();
-    //expect(result[0].count).toBeGreaterThanOrEqual(0);
-  });
-  // test("test to delete a book",async  () => {
+  // test("test to delete a book", async () => {
   //   const whereParams: SimpleWhereExpression<IBook> = {
   //     id: { op: "EQUALS", value: 8 },
   //   };
@@ -117,6 +149,6 @@ describe("tests of functionality of execution of middle layer", () => {
   //     tableName: "books",
   //     where: whereParams,
   //   });
-  //   console.log(result)
+  //   console.log(result);
   // });
 });

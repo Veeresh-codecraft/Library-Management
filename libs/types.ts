@@ -8,7 +8,9 @@ export type StringOperator =
   | "ENDS_WITH"
   | "NOT_ENDS_WITH"
   | "CONTAINS"
-  | "NOT_CONTAINS";
+  | "NOT_CONTAINS"
+  | "IN"
+  | "NOT_IN";
 
 export type NumberOperator =
   | "EQUALS"

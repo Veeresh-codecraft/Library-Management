@@ -107,7 +107,7 @@ async function addBook(repo: BookRepository) {
 
 async function updateBook(repo: BookRepository) {
   const id = +(await readLine("Please enter the ID of the book to update:"));
-  const book = repo.getById(id)!;
+  const book = await repo.getById(id)!;
   if (!book) {
     console.log(`Book with ID ${id} not found.`);
     return;
@@ -136,7 +136,7 @@ async function updateBook(repo: BookRepository) {
 async function deleteBook(repo: BookRepository) {
   const bookId = await readLine(`Please enter book id to delete:`);
   const deletedBook = await repo.delete(+bookId);
-  console.log("Book deleted successfully\nDeleted Book:");
+  //console.log("Book deleted successfully\nDeleted Book:");
   console.table(deletedBook);
 }
 
@@ -210,6 +210,13 @@ async function showPaginatedBooks(repo: BookRepository): Promise<void> {
   }
   process.stdin.resume();
 }
+function debounce(fn: Function, delay: number) {
+  let timer: NodeJS.Timeout;
+  return function (...args: any[]) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}
 
 async function searchByKeyWord(repo: BookRepository) {
   const rl = readline.createInterface({
@@ -222,51 +229,97 @@ async function searchByKeyWord(repo: BookRepository) {
   let offset = 0;
   const limit = 10; // Number of items per page
   let totalBooks = 0;
+  let searching = false; // Flag to toggle between search and pagination modes
+  let selectedBookIndex = 0;
+  let books: any[] = [];
 
-  const handleKeyPress = async (
-    chunk: Buffer,
-    key: { name: string; sequence: string }
-  ) => {
-    if (key.sequence === "0") {
-      rl.close();
-      return; // Exit the search
-    } else if (key.sequence === "\b" || key.sequence === "\u007F") {
-      // Handle backspace
-      searchQuery = searchQuery.slice(0, -1);
-      offset = 0; // Reset offset on query change
-    } else if (/^[a-zA-Z0-9 ]$/.test(key.sequence)) {
-      searchQuery += key.sequence;
-      offset = 0; // Reset offset on query change
-    } else if (key.name === "right" && offset + limit < totalBooks) {
-      offset += limit;
-    } else if (key.name === "left" && offset > 0) {
-      offset -= limit;
-    }
-
-    if (searchQuery.length > 0) {
-      const books = await repo.searchByKeyword(searchQuery);
+  const displayBooks = async (query: string) => {
+    readline.cursorTo(process.stdout, 0, 1);
+    readline.clearScreenDown(process.stdout);
+    if (query.length > 0) {
+      books = await repo.searchByKeyword(query);
+      totalBooks = books.length;
+      const topResults = books.slice(0, 5);
+      console.log(`Search results for "${query}":`);
+      console.table(
+        topResults.map((book, index) => ({
+          Selected: index === selectedBookIndex ? "←" : "",
+          ...book,
+        }))
+      );
+      console.log(
+        `Press '0' to exit. Use '↑'/'↓' to navigate, 'Enter' to select.`
+      );
+    } else {
+      const response = repo.list({ limit, offset });
+      books = response.items;
       totalBooks = books.length;
       const paginatedBooks = books.slice(offset, offset + limit);
-      console.clear();
-      console.log(`Search results for "${searchQuery}":`);
+      console.table(
+        paginatedBooks.map((book, index) => ({
+          Selected: index === selectedBookIndex ? "←" : "",
+          ...book,
+        }))
+      );
+      console.log(
+        "Press '←' for previous page, '→' for next page, '↑'/'↓' to select, 'Enter' to select a book, or '0' to quit."
+      );
+
+      // Display progress bar
       const progress = Math.min(40, Math.floor((offset / totalBooks) * 40));
       const remaining = 40 - progress;
       console.log(
         `[${"=".repeat(progress)}${">".repeat(
           offset + limit < totalBooks ? 1 : 0
-        )}${" ".repeat(remaining / 2 - 2)}]`
+        )}${" ".repeat(remaining)}]`
       );
-      console.log(
-        "Press '←' for previous page, '→' for next page, or '0' to quit."
-      );
-      console.table(paginatedBooks);
-
-      // Display progress bar
-    } else {
-      console.clear();
-      console.log(`Start typing to search...`);
     }
+    readline.cursorTo(process.stdout, 0, 0);
+    process.stdout.write(`Search: ${searchQuery}`);
   };
+
+  const handleKeyPress = debounce(
+    async (chunk: Buffer, key: { name: string; sequence: string }) => {
+      if (key.sequence === "0") {
+        rl.close();
+        return; // Exit the search
+      } else if (key.sequence === "\b" || key.sequence === "\u007F") {
+        // Handle backspace
+        searchQuery = searchQuery.slice(0, -1);
+        offset = 0; // Reset offset on query change
+        searching = searchQuery.length > 0;
+        selectedBookIndex = 0; // Reset selection index
+      } else if (/^[a-zA-Z0-9 ]$/.test(key.sequence)) {
+        searchQuery += key.sequence;
+        offset = 0; // Reset offset on query change
+        searching = true;
+        selectedBookIndex = 0; // Reset selection index
+      } else if (
+        !searching &&
+        key.name === "right" &&
+        offset + limit < totalBooks
+      ) {
+        offset += limit;
+      } else if (!searching && key.name === "left" && offset > 0) {
+        offset -= limit;
+      } else if (key.name === "up" && selectedBookIndex > 0) {
+        selectedBookIndex--;
+      } else if (
+        key.name === "down" &&
+        selectedBookIndex < Math.min(searching ? 5 : limit, totalBooks) - 1
+      ) {
+        selectedBookIndex++;
+      } else if (key.name === "return") {
+        console.clear();
+        console.log(`Selected Book:`);
+        console.table([books[selectedBookIndex]]);
+        return;
+      }
+
+      await displayBooks(searchQuery);
+    },
+    500
+  ); // Increased debounce delay of 500ms
 
   readline.emitKeypressEvents(process.stdin);
   if (process.stdin.isTTY) {
@@ -276,7 +329,10 @@ async function searchByKeyWord(repo: BookRepository) {
   process.stdin.on("keypress", handleKeyPress);
 
   console.clear();
-  console.log(`Start typing to search... (Press '0' to exit)`);
+  process.stdout.write(`Search: ${searchQuery}`);
+  console.log(`\nStart typing to search... (Press '0' to exit)`);
+
+  await displayBooks(searchQuery);
 
   await new Promise<void>((resolve) => {
     rl.on("close", resolve);
