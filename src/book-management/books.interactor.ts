@@ -85,24 +85,11 @@ async function addBook(repo: BookRepository) {
   const book: IBookBase = await getBookInput();
 
   const createdBook = await repo.create(book);
-
-  const result = (await handleDatabaseOperation<IBookBase>("INSERT", {
-    tableName: "books",
-    data: [createdBook],
-  })) as ResultSetHeader;
-
-  const insertedBookId = result.insertId;
-  console.clear();
-  console.log(`Book added successfully\nBook Id:${insertedBookId}`);
-  const whereParams: SimpleWhereExpression<IBook> = {
-    id: { op: "EQUALS", value: insertedBookId },
-  };
-  const resultBook = (await handleDatabaseOperation("SELECT", {
-    tableName: "books ",
-    fieldsToSelect: [],
-    where: whereParams,
-  })) as RowDataPacket;
-  console.table(resultBook);
+  if (createdBook) {
+    console.log("Book inserted Successfully...");
+    console.log("Book ID: ", createdBook.id);
+    console.table(createdBook);
+  }
 }
 
 async function updateBook(repo: BookRepository) {
@@ -210,6 +197,8 @@ async function showPaginatedBooks(repo: BookRepository): Promise<void> {
   }
   process.stdin.resume();
 }
+
+//debouncing
 function debounce(fn: Function, delay: number) {
   let timer: NodeJS.Timeout;
   return function (...args: any[]) {
@@ -279,7 +268,7 @@ async function searchByKeyWord(repo: BookRepository) {
   };
 
   const handleKeyPress = debounce(
-    async (chunk: Buffer, key: { name: string; sequence: string }) => {
+    async (key: { name: string; sequence: string }) => {
       if (key.sequence === "0") {
         rl.close();
         return; // Exit the search

@@ -3,15 +3,23 @@ import mysql, {
   PoolConnection as MySqlPoolConn,
 } from "mysql2/promise";
 
+export interface DBConfig {
+  dbURL: string;
+}
 // Interface Definitions
 export interface IConnection<QR> {
   initialize(): Promise<void>;
   query<T extends QR>(sql: string, values: any): Promise<T>;
 }
 
-export interface IConnectionPool<QR> {
-  acquireConnection(): Promise<PoolConnection<QR>>;
-  acquireTransactionConnection(): Promise<TransactionPoolConnection<QR>>;
+export interface SqlPoolFactory<QR> {
+  acquirePoolConnection(): Promise<PoolConnection<QR>>;
+  acquireTransactionPoolConnection(): Promise<TransactionPoolConnection<QR>>;
+}
+
+export interface SqlConnectionFactory<QR> {
+  acquireConnection(): Promise<StandaloneConnection<QR>>;
+  acquireTransactionConnection(): Promise<TransactionConnection<QR>>;
 }
 
 // Abstract Class Definitions
@@ -70,7 +78,7 @@ export class MySqlStandaloneConnection extends StandaloneConnection<QueryResult>
 }
 
 export class MySqlPoolConnection extends PoolConnection<QueryResult> {
-  private connection: mysql.PoolConnection | undefined;
+  private connection: mysql.PoolConnection | undefined | null;
   constructor(private readonly pool: mysql.Pool) {
     super();
   }
@@ -90,7 +98,8 @@ export class MySqlPoolConnection extends PoolConnection<QueryResult> {
 
   async release(): Promise<void> {
     if (!this.connection) return;
-    return this.connection.release();
+    this.connection!.release();
+    this.connection = null;
   }
 }
 
@@ -131,7 +140,7 @@ export class MySqlTransactionConnection extends TransactionConnection<QueryResul
 }
 
 export class MySqlTransactionPoolConnection extends TransactionPoolConnection<QueryResult> {
-  private connection: MySqlPoolConn | undefined;
+  private connection: MySqlPoolConn | undefined | null;
   constructor(private readonly pool: mysql.Pool) {
     super();
   }
@@ -162,6 +171,51 @@ export class MySqlTransactionPoolConnection extends TransactionPoolConnection<Qu
 
   async release(): Promise<void> {
     if (!this.connection) return;
-    return this.connection.release();
+    this.connection = null;
+    return this.connection!.release();
+  }
+}
+
+export class MySqlPoolFactory implements SqlPoolFactory<QueryResult> {
+  private pool: mysql.Pool;
+
+  constructor(private readonly config: DBConfig) {
+    this.pool = mysql.createPool(this.config.dbURL);
+  }
+
+  async acquirePoolConnection(): Promise<PoolConnection<QueryResult>> {
+    const connection = new MySqlPoolConnection(this.pool);
+    await connection.initialize();
+    return connection;
+  }
+
+  async acquireTransactionPoolConnection(): Promise<
+    TransactionPoolConnection<QueryResult>
+  > {
+    const connection = new MySqlTransactionPoolConnection(this.pool);
+    await connection.initialize();
+    return connection;
+  }
+}
+
+export class MySqlConnectionFactory
+  implements SqlConnectionFactory<QueryResult>
+{
+  private connectionUrl: string | undefined;
+  constructor(private readonly config: DBConfig) {
+    this.connectionUrl = config.dbURL;
+  }
+  async acquireConnection(): Promise<StandaloneConnection<QueryResult>> {
+    const connection = new MySqlStandaloneConnection(this.connectionUrl!);
+    await connection.initialize();
+    return connection;
+  }
+
+  async acquireTransactionConnection(): Promise<
+    TransactionConnection<QueryResult>
+  > {
+    const connection = new MySqlTransactionConnection(this.connectionUrl!);
+    await connection.initialize();
+    return connection;
   }
 }
