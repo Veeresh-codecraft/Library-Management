@@ -12,12 +12,9 @@ export interface IConnection<QR> {
   query<T extends QR>(sql: string, values: any): Promise<T>;
 }
 
-export interface SqlPoolFactory<QR> {
+export interface SqlFactory<QR> {
   acquirePoolConnection(): Promise<PoolConnection<QR>>;
   acquireTransactionPoolConnection(): Promise<TransactionPoolConnection<QR>>;
-}
-
-export interface SqlConnectionFactory<QR> {
   acquireConnection(): Promise<StandaloneConnection<QR>>;
   acquireTransactionConnection(): Promise<TransactionConnection<QR>>;
 }
@@ -176,14 +173,29 @@ export class MySqlTransactionPoolConnection extends TransactionPoolConnection<Qu
   }
 }
 
-export class MySqlPoolFactory implements SqlPoolFactory<QueryResult> {
-  private pool: mysql.Pool;
+export class MySqlFactory implements SqlFactory<QueryResult> {
+  private pool: mysql.Pool | null = null;
 
-  constructor(private readonly config: DBConfig) {
-    this.pool = mysql.createPool(this.config.dbURL);
+  constructor(private readonly config: DBConfig) {}
+
+  async acquireConnection(): Promise<StandaloneConnection<QueryResult>> {
+    const connection = new MySqlStandaloneConnection(this.config.dbURL);
+    await connection.initialize();
+    return connection;
+  }
+
+  async acquireTransactionConnection(): Promise<
+    TransactionConnection<QueryResult>
+  > {
+    const connection = new MySqlTransactionConnection(this.config.dbURL);
+    await connection.initialize();
+    return connection;
   }
 
   async acquirePoolConnection(): Promise<PoolConnection<QueryResult>> {
+    if (this.pool === null) {
+      this.pool = mysql.createPool(this.config.dbURL);
+    }
     const connection = new MySqlPoolConnection(this.pool);
     await connection.initialize();
     return connection;
@@ -192,29 +204,10 @@ export class MySqlPoolFactory implements SqlPoolFactory<QueryResult> {
   async acquireTransactionPoolConnection(): Promise<
     TransactionPoolConnection<QueryResult>
   > {
+    if (this.pool === null) {
+      this.pool = mysql.createPool(this.config.dbURL);
+    }
     const connection = new MySqlTransactionPoolConnection(this.pool);
-    await connection.initialize();
-    return connection;
-  }
-}
-
-export class MySqlConnectionFactory
-  implements SqlConnectionFactory<QueryResult>
-{
-  private connectionUrl: string | undefined;
-  constructor(private readonly config: DBConfig) {
-    this.connectionUrl = config.dbURL;
-  }
-  async acquireConnection(): Promise<StandaloneConnection<QueryResult>> {
-    const connection = new MySqlStandaloneConnection(this.connectionUrl!);
-    await connection.initialize();
-    return connection;
-  }
-
-  async acquireTransactionConnection(): Promise<
-    TransactionConnection<QueryResult>
-  > {
-    const connection = new MySqlTransactionConnection(this.connectionUrl!);
     await connection.initialize();
     return connection;
   }

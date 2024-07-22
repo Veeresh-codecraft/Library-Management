@@ -6,23 +6,23 @@ import { handleDatabaseOperation } from "../diLayer";
 import { SimpleWhereExpression } from "../../libs/types";
 import { error } from "console";
 import { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2";
-import {
-  DBConfig,
-  MySqlConnectionFactory,
-  MySqlPoolFactory,
-} from "../../db/mysqlconnection";
+
 import { AppEnvs } from "../../read-env";
 import {
+  generateDeleteSql,
   generateInsertSql,
   generateSelectSql,
+  generateUpdateSql,
+  MySqlQueryGenerator,
 } from "../../libs/mysql-query-generator";
+import { DBConfig, MySqlFactory } from "../../db/mysqlconnection";
 const config: DBConfig = {
   dbURL: AppEnvs.DATABASE_URL,
 };
 export class BookRepository implements IRepository<IBookBase, IBook> {
   private readonly books: IBook[];
 
-  private factory = new MySqlPoolFactory(config);
+  private factory = new MySqlFactory(config);
   constructor(private readonly db: Database<{ books: IBook[] }>) {
     this.books = this.db.table("books");
   }
@@ -82,24 +82,44 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
    * @returns {Promise<IBook | null>} The updated book or null if the book was not found.
    */
   async update(id: number, data: IBook): Promise<IBook | null> {
+    const connection = await this.factory.acquirePoolConnection();
     const whereParams: SimpleWhereExpression<IBook> = {
       id: { op: "EQUALS", value: id },
     };
-
-    const result = (await handleDatabaseOperation<IBook>("UPDATE", {
-      tableName: "books",
-      data: [data],
-      where: whereParams,
-    })) as ResultSetHeader;
-    const updatedBook = (await handleDatabaseOperation<IBook>("SELECT", {
-      tableName: "books ",
-      fieldsToSelect: [],
-      where: whereParams,
-    })) as IBook;
-    if (result.affectedRows <= 0) {
-      throw new Error("Update is unsuccessful");
+    try {
+      const updateQuery = await generateUpdateSql("books", [data], whereParams);
+      connection.initialize();
+      const result = await connection.query<ResultSetHeader>(
+        updateQuery.sqlQuery,
+        updateQuery.values
+      );
+      if (result.affectedRows == 1) {
+        const selectQuery = await generateSelectSql(
+          "books",
+          [],
+          whereParams,
+          0,
+          10
+        );
+        const updatedBook = (await connection.query(
+          selectQuery.sqlQuery,
+          selectQuery.values
+        )) as RowDataPacket;
+        if (updatedBook) {
+          return updatedBook[0] as IBook;
+        } else {
+          return null;
+        }
+      } else {
+        console.log("Unable to update th book");
+        return null;
+      }
+    } catch (err) {
+      console.error(err);
+      return null;
+    } finally {
+      connection.release();
     }
-    return updatedBook;
   }
 
   /**
@@ -108,29 +128,41 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
    * @returns {Promise<IBook | null>} The deleted book or null if the book was not found.
    */
   async delete(id: number): Promise<IBook | null> {
-    //const index = this.books.findIndex((b) => b.id === id);
+    const connection = await this.factory.acquirePoolConnection();
     const whereParams: SimpleWhereExpression<IBook> = {
       id: { op: "EQUALS", value: id },
     };
-
-    const deletedBook = (await handleDatabaseOperation<IBook>("SELECT", {
-      tableName: "books ",
-      fieldsToSelect: [],
-      where: whereParams,
-    })) as IBook;
+    const deleteQuery = await generateDeleteSql("books ", whereParams);
+    const deletedBookQuery = await generateSelectSql(
+      "books",
+      [],
+      whereParams,
+      0,
+      10
+    );
     try {
-      const result = (await handleDatabaseOperation("DELETE", {
-        tableName: "books",
-        where: whereParams,
-      })) as ResultSetHeader;
-      if (result.affectedRows === 1) {
-        console.log("Deleted Successfully");
+      connection.initialize();
+      const deletedBook = (await connection.query(
+        deletedBookQuery.sqlQuery,
+        deleteQuery.values
+      )) as RowDataPacket;
+      if (deletedBook) {
+        const deleteResult = await connection.query<ResultSetHeader>(
+          deleteQuery.sqlQuery,
+          deleteQuery.values
+        );
+        if (deleteResult.affectedRows === 1) {
+          return deletedBook[0] as IBook;
+        } else {
+          console.error("could not delete book");
+        }
       }
+      return null;
     } catch (err) {
       throw new Error("deletion failed");
+    } finally {
+      connection.release();
     }
-    //const deletedBook = this.books.splice(index, 1)[0];
-    return deletedBook;
   }
 
   /**

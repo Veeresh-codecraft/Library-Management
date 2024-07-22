@@ -89,6 +89,12 @@ async function addBook(repo: BookRepository) {
     console.log("Book inserted Successfully...");
     console.log("Book ID: ", createdBook.id);
     console.table(createdBook);
+    const isMoreBook = await readChar("Any more book to add??(y/n): ");
+    if (isMoreBook === "y") {
+      await addBook(repo);
+    } else if (isMoreBook === "n") {
+      console.log("Returning to Book Menu \n");
+    }
   }
 }
 
@@ -123,7 +129,7 @@ async function updateBook(repo: BookRepository) {
 async function deleteBook(repo: BookRepository) {
   const bookId = await readLine(`Please enter book id to delete:`);
   const deletedBook = await repo.delete(+bookId);
-  //console.log("Book deleted successfully\nDeleted Book:");
+  console.log("Book deleted successfully\nDeleted Book:");
   console.table(deletedBook);
 }
 
@@ -308,7 +314,7 @@ async function searchByKeyWord(repo: BookRepository) {
       await displayBooks(searchQuery);
     },
     500
-  ); // Increased debounce delay of 500ms
+  ); //debounce delay of 500ms
 
   readline.emitKeypressEvents(process.stdin);
   if (process.stdin.isTTY) {
