@@ -148,50 +148,46 @@ async function showPaginatedBooks(repo: BookRepository): Promise<void> {
     process.stdin.setRawMode(true);
   }
 
-  const handleKeyPress = (
+  const handleKeyPress = async (
     chunk: Buffer,
     key: { name: string; sequence: string }
   ) => {
     if (key.name === "q") {
       rl.close();
-      return; // Exit the function to return to the books menu
+      return;
     }
-    if (
-      key.name === "right" &&
-      repo.list({ limit, offset }).pagination.hasNext
-    ) {
+
+    const response = await repo.list({ limit, offset });
+
+    if (key.name === "right" && response.pagination.hasNext) {
       offset += limit;
-    } else if (
-      key.name === "left" &&
-      repo.list({ limit, offset }).pagination.hasPrevious
-    ) {
+    } else if (key.name === "left" && response.pagination.hasPrevious) {
       offset -= limit;
     } else if (key.name === "q") {
       rl.close();
       return; // Exit the function to return to the books menu
     }
+
     showPage();
   };
 
-  const showPage = () => {
-    const response = repo.list({ limit, offset });
+  const showPage = async () => {
+    const response = await repo.list({ limit, offset });
+
     console.clear();
     console.table(response.items);
-    //TODO: progress bar
-    // console.log(
-    //   "[" +
-    //     "=".repeat(offset + limit - 2) +
-    //     "=>" +
-    //     " ".repeat(40 - offset + limit) +
-    //     "]"
-    // );
     console.log(
-      "Press '←' for next page, '→' for previous page, or 'q' to quit."
+      `Page ${Math.floor(offset / limit) + 1} of ${Math.ceil(
+        response.pagination.total / limit
+      )}`
+    );
+    console.log(
+      `Press '→' for next page, '←' for previous page, or 'q' to quit.`
     );
   };
 
   process.stdin.on("keypress", handleKeyPress);
-  showPage();
+  await showPage();
 
   await new Promise<void>((resolve) => {
     rl.on("close", resolve);
@@ -232,49 +228,59 @@ async function searchByKeyWord(repo: BookRepository) {
     readline.cursorTo(process.stdout, 0, 1);
     readline.clearScreenDown(process.stdout);
     if (query.length > 0) {
-      books = await repo.searchByKeyword(query);
-      totalBooks = books.length;
-      const topResults = books.slice(0, 5);
-      console.log(`Search results for "${query}":`);
-      console.table(
-        topResults.map((book, index) => ({
-          Selected: index === selectedBookIndex ? "←" : "",
-          ...book,
-        }))
-      );
-      console.log(
-        `Press '0' to exit. Use '↑'/'↓' to navigate, 'Enter' to select.`
-      );
+      try {
+        books = await repo.searchByKeyword(query);
+        totalBooks = books.length;
+        const topResults = books.slice(0, 5);
+        console.log(`Search results for "${query}":`);
+        console.table(
+          topResults.map((book, index) => ({
+            Selected: index === selectedBookIndex ? "←" : "",
+            ...book,
+          }))
+        );
+        console.log(
+          `Press '0' to exit. Use '↑'/'↓' to navigate, 'Enter' to select.`
+        );
+      } catch (err) {
+        console.error("Error searching books:", err);
+      }
     } else {
-      const response = repo.list({ limit, offset });
-      books = response.items;
-      totalBooks = books.length;
-      const paginatedBooks = books.slice(offset, offset + limit);
-      console.table(
-        paginatedBooks.map((book, index) => ({
-          Selected: index === selectedBookIndex ? "←" : "",
-          ...book,
-        }))
-      );
-      console.log(
-        "Press '←' for previous page, '→' for next page, '↑'/'↓' to select, 'Enter' to select a book, or '0' to quit."
-      );
+      try {
+        const response = await repo.list({ limit, offset });
+        books = response.items;
+        totalBooks = response.pagination.total;
+        const paginatedBooks = books.slice(offset, offset + limit);
+        console.table(
+          paginatedBooks.map((book, index) => ({
+            Selected: index === selectedBookIndex ? "←" : "",
+            ...book,
+          }))
+        );
+        console.log(
+          "Press '←' for previous page, '→' for next page, '↑'/'↓' to select, 'Enter' to select a book, or '0' to quit."
+        );
 
-      // Display progress bar
-      const progress = Math.min(40, Math.floor((offset / totalBooks) * 40));
-      const remaining = 40 - progress;
-      console.log(
-        `[${"=".repeat(progress)}${">".repeat(
-          offset + limit < totalBooks ? 1 : 0
-        )}${" ".repeat(remaining)}]`
-      );
+        // Display progress bar
+        const progress = Math.min(40, Math.floor((offset / totalBooks) * 40));
+        const remaining = 40 - progress;
+        console.log(
+          `[${"=".repeat(progress)}${">".repeat(
+            offset + limit < totalBooks ? 1 : 0
+          )}${" ".repeat(remaining)}]`
+        );
+      } catch (err) {
+        console.error("Error fetching books:", err);
+      }
     }
     readline.cursorTo(process.stdout, 0, 0);
     process.stdout.write(`Search: ${searchQuery}`);
   };
 
   const handleKeyPress = debounce(
-    async (key: { name: string; sequence: string }) => {
+    async (key: { name?: string; sequence?: string }) => {
+      if (!key) return;
+
       if (key.sequence === "0") {
         rl.close();
         return; // Exit the search
@@ -284,8 +290,8 @@ async function searchByKeyWord(repo: BookRepository) {
         offset = 0; // Reset offset on query change
         searching = searchQuery.length > 0;
         selectedBookIndex = 0; // Reset selection index
-      } else if (/^[a-zA-Z0-9 ]$/.test(key.sequence)) {
-        searchQuery += key.sequence;
+      } else if (/^[a-zA-Z0-9 ]$/.test(key.sequence || "")) {
+        searchQuery += key.sequence || "";
         offset = 0; // Reset offset on query change
         searching = true;
         selectedBookIndex = 0; // Reset selection index
@@ -306,22 +312,26 @@ async function searchByKeyWord(repo: BookRepository) {
         selectedBookIndex++;
       } else if (key.name === "return") {
         console.clear();
-        console.log(`Selected Book:`);
-        console.table([books[selectedBookIndex]]);
+        if (books[selectedBookIndex]) {
+          console.log(`Selected Book:`);
+          console.table([books[selectedBookIndex]]);
+        }
         return;
       }
 
       await displayBooks(searchQuery);
     },
-    500
-  ); //debounce delay of 500ms
+    0
+  );
 
   readline.emitKeypressEvents(process.stdin);
   if (process.stdin.isTTY) {
     process.stdin.setRawMode(true);
   }
 
-  process.stdin.on("keypress", handleKeyPress);
+  process.stdin.on("keypress", (str, key) => {
+    handleKeyPress(key);
+  });
 
   console.clear();
   process.stdout.write(`Search: ${searchQuery}`);
@@ -333,9 +343,20 @@ async function searchByKeyWord(repo: BookRepository) {
     rl.on("close", resolve);
   });
 
-  process.stdin.removeListener("keypress", handleKeyPress);
+  process.stdin.removeListener("keypress", (str, key) => {
+    handleKeyPress(key);
+  });
+
   if (process.stdin.isTTY) {
     process.stdin.setRawMode(false);
   }
   process.stdin.resume();
 }
+
+// function debounce(func: Function, delay: number) {
+//   let timer: NodeJS.Timeout;
+//   return function (...args: any[]) {
+//     clearTimeout(timer);
+//     timer = setTimeout(() => func.apply(this, args), delay);
+//   };
+// }

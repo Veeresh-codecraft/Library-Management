@@ -211,7 +211,7 @@ const generateSelectSql = <Model>(
 
   let sqlQuery = `SELECT ${selectClause} FROM ${tableName}`;
   sqlQuery += whereClause ? ` WHERE ${whereClause} ` : "";
-  sqlQuery += `LIMIT ${limit} OFFSET ${offset}`;
+  sqlQuery += ` LIMIT ${limit} OFFSET ${offset}`;
 
   return { sqlQuery, values };
 };

@@ -176,13 +176,13 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
       id: { op: "EQUALS", value: id },
     };
     try {
-      const selectQuery = (await generateSelectSql(
+      const selectQuery = await generateSelectSql(
         "books",
         [],
         whereParams,
         0,
         10
-      )) as RowDataPacket;
+      );
       const book = (await connection.query(
         selectQuery.sqlQuery,
         selectQuery.values
@@ -205,45 +205,104 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
    * @param {IPageRequest} params - The pagination and search parameters.
    * @returns {IPagedResponse<IBook>} The paginated response containing books and pagination info.
    */
-  list(params: IPageRequest): IPagedResponse<IBook> {
-    const search = params.search?.toLocaleLowerCase();
-    const filteredBooks = search
-      ? this.books.filter(
-          (b) =>
-            b.title.toLocaleLowerCase().includes(search) ||
-            b.isbnNo.toLocaleLowerCase().includes(search)
-        )
-      : this.books;
-    const totLen = filteredBooks.length;
-    const items = filteredBooks.slice(
-      params.offset,
-      params.limit + params.offset
-    );
-    const hasNext = params.offset + params.limit < filteredBooks.length;
-    const hasPrevious = params.offset > 0;
+  // list(params: IPageRequest): IPagedResponse<IBook> {
+  //   const search = params.search?.toLocaleLowerCase();
+  //   const filteredBooks = search
+  //     ? this.books.filter(
+  //         (b) =>
+  //           b.title.toLocaleLowerCase().includes(search) ||
+  //           b.isbnNo.toLocaleLowerCase().includes(search)
+  //       )
+  //     : this.books;
+  //   const totLen = filteredBooks.length;
+  //   const items = filteredBooks.slice(
+  //     params.offset,
+  //     params.limit + params.offset
+  //   );
+  //   const hasNext = params.offset + params.limit < filteredBooks.length;
+  //   const hasPrevious = params.offset > 0;
 
-    return {
-      items,
-      pagination: {
-        offset: params.offset,
-        limit: params.limit,
-        total: filteredBooks.length,
-        hasNext,
-        hasPrevious,
-      },
-    };
+  //   return {
+  //     items,
+  //     pagination: {
+  //       offset: params.offset,
+  //       limit: params.limit,
+  //       total: filteredBooks.length,
+  //       hasNext,
+  //       hasPrevious,
+  //     },
+  //   };
+  // }
+  async list(params: {
+    limit: number;
+    offset: number;
+    search?: string;
+  }): Promise<any> {
+    const { limit, offset, search } = params;
+    const connection = await this.factory.acquirePoolConnection();
+    const whereParams: SimpleWhereExpression<IBook> = {};
+
+    if (search) {
+      whereParams.title = { op: "CONTAINS", value: `%${search}%` };
+      whereParams.isbnNo = { op: "CONTAINS", value: `%${search}%` };
+    }
+
+    try {
+      const selectQuery = await generateSelectSql(
+        "books",
+        [],
+        whereParams,
+        offset,
+        limit
+      );
+
+      const books = (await connection.query(
+        selectQuery.sqlQuery,
+        selectQuery.values
+      )) as RowDataPacket;
+
+      return {
+        items: books.map((book: RowDataPacket) => book as IBook),
+        pagination: {
+          offset,
+          limit,
+          total: books.length,
+          hasNext: offset + limit < books.length,
+          hasPrevious: offset > 0,
+        },
+      };
+    } catch (err) {
+      throw err;
+    } finally {
+      await connection.release();
+    }
   }
+
   async searchByKeyword(keyword: string): Promise<IBook[]> {
-    const result = (await handleDatabaseOperation<IBook>("SELECT", {
-      tableName: "books ",
-      fieldsToSelect: [],
-      //where: whereParams,
-      offset: 0,
-      limit: 1000,
-    })) as IBook[];
-    //const books = await this.list({ limit: 1000, offset: 0 }).items;
-    return result.filter((book) =>
-      book.title.toLowerCase().includes(keyword.toLowerCase())
-    );
+    const connection = await this.factory.acquirePoolConnection();
+    const whereParams: SimpleWhereExpression<IBook> = {
+      title: { op: "CONTAINS", value: `%${keyword}%` },
+    };
+
+    try {
+      const selectQuery = await generateSelectSql(
+        "books",
+        [],
+        whereParams,
+        0,
+        10000
+      );
+      const result = (await connection.query(
+        selectQuery.sqlQuery,
+        selectQuery.values
+      )) as RowDataPacket[];
+
+      return result.map((row: RowDataPacket) => row as IBook);
+    } catch (err) {
+      console.error("Error searching books:", err);
+      throw err; // Re-throw the error to be caught by the caller
+    } finally {
+      await connection.release();
+    }
   }
 }

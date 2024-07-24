@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1721727766967,
+      "tag": "0000_chubby_stark_industries",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1721837611920,
+      "tag": "0001_little_boomer",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1721837658917,
+      "tag": "0002_wooden_jackal",
+      "breakpoints": true
+    }
+  ]
+}
