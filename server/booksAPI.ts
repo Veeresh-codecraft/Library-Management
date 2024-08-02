@@ -168,7 +168,7 @@ const parseJsonBody: RequestProcessor = async (request, response) => {
   }
 };
 
-// middleware to set headers and parse JSON body
+// middleware to set headers and parse JSON body.
 server.use(async (request: IncomingMessage, response: ServerResponse) => {
   try {
     setHeaders(request, response);
