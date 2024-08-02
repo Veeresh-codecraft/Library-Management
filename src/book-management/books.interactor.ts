@@ -9,6 +9,7 @@ import * as readline from "readline";
 import { handleDatabaseOperation } from "../diLayer";
 import { QueryResult, ResultSetHeader, RowDataPacket } from "mysql2";
 import { SimpleWhereExpression } from "../../libs/types";
+import { MySql2Database } from "drizzle-orm/mysql2";
 const menu = new Menu("Book Management", [
   { key: "1", label: "Add Book" },
   { key: "2", label: "Edit Book" },
@@ -19,9 +20,8 @@ const menu = new Menu("Book Management", [
 ]);
 
 export class BookInteractor implements IInteractor {
-  private repo = new BookRepository(
-    new Database("../Library-Management/data/books.json")
-  );
+  constructor(private readonly db: MySql2Database<Record<string, unknown>>) {}
+  private repo = new BookRepository(this.db);
 
   async showMenu(): Promise<void> {
     let loop = true;
@@ -176,11 +176,11 @@ async function showPaginatedBooks(repo: BookRepository): Promise<void> {
 
     console.clear();
     console.table(response.items);
-    console.log(
-      `Page ${Math.floor(offset / limit) + 1} of ${Math.ceil(
-        response.pagination.total / limit
-      )}`
-    );
+    // console.log(
+    //   `Page ${Math.floor(offset / limit) + 1} of ${Math.ceil(
+    //     response.pagination.total / limit
+    //   )}`
+    // );
     console.log(
       `Press '→' for next page, '←' for previous page, or 'q' to quit.`
     );
@@ -224,15 +224,20 @@ async function searchByKeyWord(repo: BookRepository) {
   let selectedBookIndex = 0;
   let books: any[] = [];
 
-  const displayBooks = async (query: string) => {
+  const displayBooks = async () => {
     readline.cursorTo(process.stdout, 0, 1);
     readline.clearScreenDown(process.stdout);
-    if (query.length > 0) {
+
+    if (searchQuery.length > 0) {
+      // Search mode
       try {
-        books = await repo.searchByKeyword(query);
+        readline.clearScreenDown(process.stdout);
+        books = await repo.searchByKeyword(searchQuery);
         totalBooks = books.length;
-        const topResults = books.slice(0, 5);
-        console.log(`Search results for "${query}":`);
+        const topResults = books.slice(0, 5); // Displaying only the top 5 results
+
+        console.log("\n");
+        console.log(`Search results for "${searchQuery}":`);
         console.table(
           topResults.map((book, index) => ({
             Selected: index === selectedBookIndex ? "←" : "",
@@ -245,36 +250,11 @@ async function searchByKeyWord(repo: BookRepository) {
       } catch (err) {
         console.error("Error searching books:", err);
       }
-    } else {
-      try {
-        const response = await repo.list({ limit, offset });
-        books = response.items;
-        totalBooks = response.pagination.total;
-        const paginatedBooks = books.slice(offset, offset + limit);
-        console.table(
-          paginatedBooks.map((book, index) => ({
-            Selected: index === selectedBookIndex ? "←" : "",
-            ...book,
-          }))
-        );
-        console.log(
-          "Press '←' for previous page, '→' for next page, '↑'/'↓' to select, 'Enter' to select a book, or '0' to quit."
-        );
-
-        // Display progress bar
-        const progress = Math.min(40, Math.floor((offset / totalBooks) * 40));
-        const remaining = 40 - progress;
-        console.log(
-          `[${"=".repeat(progress)}${">".repeat(
-            offset + limit < totalBooks ? 1 : 0
-          )}${" ".repeat(remaining)}]`
-        );
-      } catch (err) {
-        console.error("Error fetching books:", err);
-      }
     }
+
     readline.cursorTo(process.stdout, 0, 0);
-    process.stdout.write(`Search: ${searchQuery}`);
+
+    process.stdout.write(`Press '0' to exit\nSearch: ${searchQuery}\n`);
   };
 
   const handleKeyPress = debounce(
@@ -282,6 +262,7 @@ async function searchByKeyWord(repo: BookRepository) {
       if (!key) return;
 
       if (key.sequence === "0") {
+        readline.clearScreenDown(process.stdout);
         rl.close();
         return; // Exit the search
       } else if (key.sequence === "\b" || key.sequence === "\u007F") {
@@ -301,13 +282,15 @@ async function searchByKeyWord(repo: BookRepository) {
         offset + limit < totalBooks
       ) {
         offset += limit;
+        await displayBooks();
       } else if (!searching && key.name === "left" && offset > 0) {
         offset -= limit;
+        await displayBooks();
       } else if (key.name === "up" && selectedBookIndex > 0) {
         selectedBookIndex--;
       } else if (
         key.name === "down" &&
-        selectedBookIndex < Math.min(searching ? 5 : limit, totalBooks) - 1
+        selectedBookIndex < Math.min(searching ? 5 : limit, books.length) - 1
       ) {
         selectedBookIndex++;
       } else if (key.name === "return") {
@@ -319,9 +302,9 @@ async function searchByKeyWord(repo: BookRepository) {
         return;
       }
 
-      await displayBooks(searchQuery);
+      await displayBooks();
     },
-    0
+    300 // Debounce delay in milliseconds
   );
 
   readline.emitKeypressEvents(process.stdin);
@@ -337,7 +320,7 @@ async function searchByKeyWord(repo: BookRepository) {
   process.stdout.write(`Search: ${searchQuery}`);
   console.log(`\nStart typing to search... (Press '0' to exit)`);
 
-  await displayBooks(searchQuery);
+  await displayBooks();
 
   await new Promise<void>((resolve) => {
     rl.on("close", resolve);
@@ -352,11 +335,3 @@ async function searchByKeyWord(repo: BookRepository) {
   }
   process.stdin.resume();
 }
-
-// function debounce(func: Function, delay: number) {
-//   let timer: NodeJS.Timeout;
-//   return function (...args: any[]) {
-//     clearTimeout(timer);
-//     timer = setTimeout(() => func.apply(this, args), delay);
-//   };
-// }

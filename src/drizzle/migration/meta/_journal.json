@@ -22,6 +22,13 @@
       "when": 1721837658917,
       "tag": "0002_wooden_jackal",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1721880562008,
+      "tag": "0003_large_northstar",
+      "breakpoints": true
     }
   ]
 }

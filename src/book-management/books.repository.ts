@@ -6,26 +6,17 @@ import { handleDatabaseOperation } from "../diLayer";
 import { SimpleWhereExpression } from "../../libs/types";
 import { error } from "console";
 import { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2";
-
+import { booksTable } from "../drizzle/schema";
 import { AppEnvs } from "../../read-env";
-import {
-  generateDeleteSql,
-  generateInsertSql,
-  generateSelectSql,
-  generateUpdateSql,
-  MySqlQueryGenerator,
-} from "../../libs/mysql-query-generator";
+import { and, eq, ilike, like, sql } from "drizzle-orm";
 import { DBConfig, MySqlFactory } from "../../db/mysqlconnection";
+import { MySql2Database } from "drizzle-orm/mysql2";
+import { generateSelectSql } from "../../libs/mysql-query-generator";
 const config: DBConfig = {
   dbURL: AppEnvs.DATABASE_URL,
 };
 export class BookRepository implements IRepository<IBookBase, IBook> {
-  private readonly books: IBook[];
-
-  private factory = new MySqlFactory(config);
-  constructor(private readonly db: Database<{ books: IBook[] }>) {
-    this.books = this.db.table("books");
-  }
+  constructor(private readonly db: MySql2Database<Record<string, unknown>>) {}
 
   /**
    * Creates a new book and adds it to the repository.
@@ -33,45 +24,32 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
    * @returns {Promise<IBook>} The created book with assigned ID and available number of copies.
    */
   async create(data: IBookBase): Promise<IBook> {
-    const connection = await this.factory.acquirePoolConnection();
-    const book: IBook = {
+    const book = {
       // TODO: Implement validation
       ...data,
       id: 0,
       availableNumberOfCopies: data.totalNumberOfCopies,
     };
     try {
-      const insertQuery = await generateInsertSql("books", [book]);
-      connection.initialize();
+      const [result] = await this.db
+        .insert(booksTable)
+        .values(book)
+        .$returningId();
+      // const insertedBookId = result.insertId;
 
-      const result = await connection.query<ResultSetHeader>(
-        insertQuery.sqlQuery,
-        insertQuery.values
-      );
-      const insertedBookId = result.insertId;
-      if (result.affectedRows === 1) {
-        const whereParams: SimpleWhereExpression<IBook> = {
-          id: { op: "EQUALS", value: insertedBookId },
-        };
-        const selectQuery = await generateSelectSql(
-          "books",
-          [],
-          whereParams,
-          0,
-          10
-        );
-        const insertedBook = (await connection.query(
-          selectQuery.sqlQuery,
-          selectQuery.values
-        )) as RowDataPacket;
-        return insertedBook[0] as IBook;
+      const insertedBookId = result.id;
+      if (insertedBookId) {
+        const [insertedBook] = await this.db
+          .select()
+          .from(booksTable)
+          .where(eq(booksTable.id, insertedBookId));
+        return insertedBook as IBook;
       } else {
+        console.error("Inserted But ID not matching");
         return book;
       }
     } catch (err) {
       throw err;
-    } finally {
-      await connection.release();
     }
   }
 
@@ -82,43 +60,33 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
    * @returns {Promise<IBook | null>} The updated book or null if the book was not found.
    */
   async update(id: number, data: IBook): Promise<IBook | null> {
-    const connection = await this.factory.acquirePoolConnection();
-    const whereParams: SimpleWhereExpression<IBook> = {
-      id: { op: "EQUALS", value: id },
-    };
     try {
-      const updateQuery = await generateUpdateSql("books", [data], whereParams);
-      connection.initialize();
-      const result = await connection.query<ResultSetHeader>(
-        updateQuery.sqlQuery,
-        updateQuery.values
-      );
-      if (result.affectedRows == 1) {
-        const selectQuery = await generateSelectSql(
-          "books",
-          [],
-          whereParams,
-          0,
-          10
-        );
-        const updatedBook = (await connection.query(
-          selectQuery.sqlQuery,
-          selectQuery.values
-        )) as RowDataPacket;
-        if (updatedBook) {
-          return updatedBook[0] as IBook;
-        } else {
-          return null;
-        }
+      // Perform the update operation
+      const result = await (
+        await this.db
+      )
+        .update(booksTable)
+        .set(data)
+        .where(sql`${booksTable.id} = ${id}`)
+        .execute();
+
+      if (result) {
+        const [updatedBook] = await (
+          await this.db
+        )
+          .select()
+          .from(booksTable)
+          .where(sql`${booksTable.id} = ${id}`)
+          .execute();
+
+        return updatedBook as IBook;
       } else {
-        console.log("Unable to update th book");
+        console.log("Unable to update the book");
         return null;
       }
     } catch (err) {
-      console.error(err);
+      console.error("Error updating book:", err);
       return null;
-    } finally {
-      connection.release();
     }
   }
 
@@ -128,40 +96,28 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
    * @returns {Promise<IBook | null>} The deleted book or null if the book was not found.
    */
   async delete(id: number): Promise<IBook | null> {
-    const connection = await this.factory.acquirePoolConnection();
-    const whereParams: SimpleWhereExpression<IBook> = {
-      id: { op: "EQUALS", value: id },
-    };
-    const deleteQuery = await generateDeleteSql("books ", whereParams);
-    const deletedBookQuery = await generateSelectSql(
-      "books",
-      [],
-      whereParams,
-      0,
-      10
-    );
     try {
-      connection.initialize();
-      const deletedBook = (await connection.query(
-        deletedBookQuery.sqlQuery,
-        deleteQuery.values
-      )) as RowDataPacket;
-      if (deletedBook) {
-        const deleteResult = await connection.query<ResultSetHeader>(
-          deleteQuery.sqlQuery,
-          deleteQuery.values
-        );
-        if (deleteResult.affectedRows === 1) {
-          return deletedBook[0] as IBook;
+      const [deletingBook] = await (await this.db)
+        .select()
+        .from(booksTable)
+        .where(eq(booksTable.id, id));
+      if (deletingBook) {
+        const [result] = await (await this.db)
+          .delete(booksTable)
+          .where(eq(booksTable.id, id));
+        if (result) {
+          return deletingBook as IBook;
         } else {
-          console.error("could not delete book");
+          console.error("deleting unsuccessful");
+          return null;
         }
+      } else {
+        console.error("book does not exist");
+        return null;
       }
-      return null;
     } catch (err) {
       throw new Error("deletion failed");
-    } finally {
-      connection.release();
+      return null;
     }
   }
 
@@ -171,138 +127,75 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
    * @returns {IBook | null} The book with the specified ID or null if not found.
    */
   async getById(id: number): Promise<IBook | null> {
-    const connection = await this.factory.acquirePoolConnection();
-    const whereParams: SimpleWhereExpression<IBook> = {
-      id: { op: "EQUALS", value: id },
-    };
     try {
-      const selectQuery = await generateSelectSql(
-        "books",
-        [],
-        whereParams,
-        0,
-        10
-      );
-      const book = (await connection.query(
-        selectQuery.sqlQuery,
-        selectQuery.values
-      )) as RowDataPacket;
-      if (book) {
-        return book[0] as IBook;
-      } else {
-        return null;
-      }
+      const [insertedBook] = await (await this.db)
+        .select()
+        .from(booksTable)
+        .where(eq(booksTable.id, id));
+      return insertedBook as IBook;
     } catch (err) {
       throw err;
-    } finally {
-      await connection.release();
     }
-    //const book = this.books.find((b) => b.id === id);
   }
 
-  /**
-   * Lists books with pagination and optional search filtering.
-   * @param {IPageRequest} params - The pagination and search parameters.
-   * @returns {IPagedResponse<IBook>} The paginated response containing books and pagination info.
-   */
-  // list(params: IPageRequest): IPagedResponse<IBook> {
-  //   const search = params.search?.toLocaleLowerCase();
-  //   const filteredBooks = search
-  //     ? this.books.filter(
-  //         (b) =>
-  //           b.title.toLocaleLowerCase().includes(search) ||
-  //           b.isbnNo.toLocaleLowerCase().includes(search)
-  //       )
-  //     : this.books;
-  //   const totLen = filteredBooks.length;
-  //   const items = filteredBooks.slice(
-  //     params.offset,
-  //     params.limit + params.offset
-  //   );
-  //   const hasNext = params.offset + params.limit < filteredBooks.length;
-  //   const hasPrevious = params.offset > 0;
-
-  //   return {
-  //     items,
-  //     pagination: {
-  //       offset: params.offset,
-  //       limit: params.limit,
-  //       total: filteredBooks.length,
-  //       hasNext,
-  //       hasPrevious,
-  //     },
-  //   };
-  // }
   async list(params: {
-    limit: number;
-    offset: number;
-    search?: string;
+    limit?: number; // Optional
+    offset?: number; // Optional
+    search?: string; // Optional
   }): Promise<any> {
     const { limit, offset, search } = params;
-    const connection = await this.factory.acquirePoolConnection();
-    const whereParams: SimpleWhereExpression<IBook> = {};
-
-    if (search) {
-      whereParams.title = { op: "CONTAINS", value: `%${search}%` };
-      whereParams.isbnNo = { op: "CONTAINS", value: `%${search}%` };
-    }
 
     try {
-      const selectQuery = await generateSelectSql(
-        "books",
-        [],
-        whereParams,
-        offset,
-        limit
-      );
+      // Build the query using Drizzle ORM
+      let query = (await this.db).select().from(booksTable) as any; // Type assertion to bypass TypeScript error
 
-      const books = (await connection.query(
-        selectQuery.sqlQuery,
-        selectQuery.values
-      )) as RowDataPacket;
+      if (search) {
+        query = query.where(
+          and(
+            like(booksTable.title, `%${search}%`),
+            like(booksTable.isbnNo, `%${search}%`)
+          )
+        ) as any; // Type assertion to bypass TypeScript error
+      }
+
+      // Apply limit and offset only if they are provided
+      if (limit !== undefined && offset !== undefined) {
+        query = query.limit(limit).offset(offset) as any; // Type assertion to bypass TypeScript error
+      }
+
+      const books = await query.execute();
 
       return {
-        items: books.map((book: RowDataPacket) => book as IBook),
+        items: books as IBook[],
         pagination: {
-          offset,
-          limit,
+          offset: offset || 0, // Default to 0 if not provided
+          limit: limit || books.length, // Default to total number of books if not provided
           total: books.length,
-          hasNext: offset + limit < books.length,
-          hasPrevious: offset > 0,
+          hasNext: limit !== undefined && books.length === limit, // If length matches the limit, there might be more items
+          hasPrevious: (offset || 0) > 0,
         },
       };
     } catch (err) {
+      console.error("Error listing books:", err);
       throw err;
-    } finally {
-      await connection.release();
     }
   }
 
   async searchByKeyword(keyword: string): Promise<IBook[]> {
-    const connection = await this.factory.acquirePoolConnection();
-    const whereParams: SimpleWhereExpression<IBook> = {
-      title: { op: "CONTAINS", value: `%${keyword}%` },
-    };
-
     try {
-      const selectQuery = await generateSelectSql(
-        "books",
-        [],
-        whereParams,
-        0,
-        10000
-      );
-      const result = (await connection.query(
-        selectQuery.sqlQuery,
-        selectQuery.values
-      )) as RowDataPacket[];
+      const results = await (
+        await this.db
+      )
+        .select()
+        .from(booksTable)
+        .where(like(booksTable.title, `%${keyword}%`)) // Use 'like' for case-insensitive search
+        .limit(100)
+        .execute();
 
-      return result.map((row: RowDataPacket) => row as IBook);
+      return results as IBook[];
     } catch (err) {
       console.error("Error searching books:", err);
-      throw err; // Re-throw the error to be caught by the caller
-    } finally {
-      await connection.release();
+      throw err;
     }
   }
 }
