@@ -3,29 +3,31 @@ type CountAction =
   | { type: "DEC"; payload?: number };
 
 type State = { count: number; step: number };
-
-function counterStore(initialValue: State) {
-  let state = initialValue;
-  function counterReducer(state: State, action: CountAction): State {
-    let newState = { ...state }; //can be array or primitive
-    switch (action.type) {
-      case "INC": {
-        newState = {
-          ...state,
-          count: state.count + (action.payload ?? state.step),
-        };
-        break;
-      }
-      case "DEC": {
-        newState = {
-          ...state,
-          count: state.count - (action.payload ?? state.step),
-        };
-        break;
-      }
+type CountState = State;
+function counterReducer(state: State, action: CountAction): State {
+  let newState = { ...state }; //can be array or primitive
+  switch (action.type) {
+    case "INC": {
+      newState = {
+        ...state,
+        count: state.count + (action.payload ?? state.step),
+      };
+      break;
     }
-    return newState;
+    case "DEC": {
+      newState = {
+        ...state,
+        count: state.count - (action.payload ?? state.step),
+      };
+      break;
+    }
   }
+  return newState;
+}
+
+function counterStore(initialValue: State,reducer:(state:State,action:CountAction)=>State) {
+  let state = initialValue;
+  
   return {
     getState(): State {
       return state;
@@ -36,7 +38,7 @@ function counterStore(initialValue: State) {
   };
 }
 
-const countStore = counterStore({ count: 0, step: 0 });
+const countStore = counterStore({ count: 0, step: 0 },counterReducer);
 countStore.dispatch({ type: "INC", payload: 5 });
 countStore.dispatch({ type: "DEC", payload: 2 });
 console.log(countStore.getState());
@@ -48,14 +50,23 @@ console.log(countStore.getState());
 // Mathematically, it is a function that takes current state, and the payload
 // and produces new state. This function is known as reducer.
 
-function createStore(initialState:StateT, reducer:(state:stateT, action:ActionT)=>StateT){
+function createStore<StateT,ActionT>(initialState:StateT, reducer:(state:StateT, action:ActionT)=>StateT):{
+  getState(): StateT;
+  dispatch(action: ActionT): void;
+}{
  let state = initialState;
  return{
-  getState(): State {
+  getState(): StateT {
     return state;
   },
-  dispatch(action: CountAction) {
-    state = counterReducer(state, action);
+  dispatch(action: ActionT) {
+    state = reducer(state, action);
   },
  }
 }
+
+const counterStore1 = createStore<CountState,CountAction>({ count: 0, step: 0 },counterReducer)
+
+counterStore1.dispatch({ type: "INC", payload: 5 });
+counterStore1.dispatch({ type: "DEC", payload: 2 });
+console.log(countStore.getState());

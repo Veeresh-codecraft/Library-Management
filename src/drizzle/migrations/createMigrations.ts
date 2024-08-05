@@ -14,7 +14,7 @@ async function migrateDb() {
   //   Perform migrations
   await migrate(drizzle(migrationConnection), {
     migrationsFolder:
-      "/home/vedanth/library-mgmt/Library-Management/src/drizzle/migration/", // Adjust this path to your migrations folder
+      "/Users/vedanthv/cc_intern_project/Library-Management/src/drizzle/migration", // Adjust this path to your migrations folder
   });
   await migrationConnection.end();
 }
