@@ -139,15 +139,15 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
   }
 
   async list(params: {
-    limit?: number; // Optional
-    offset?: number; // Optional
+    limit: number; // Optional
+    offset: number; // Optional
     search?: string; // Optional
   }): Promise<any> {
-    const { limit, offset, search } = params;
+    const { limit = 10, offset = 2, search } = params;
 
     try {
       // Build the query using Drizzle ORM
-      let query = (await this.db).select().from(booksTable) as any; // Type assertion to bypass TypeScript error
+      let query = this.db.select().from(booksTable) as any;
 
       if (search) {
         query = query.where(
@@ -155,23 +155,20 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
             like(booksTable.title, `%${search}%`),
             like(booksTable.isbnNo, `%${search}%`)
           )
-        ) as any; // Type assertion to bypass TypeScript error
+        ) as any;
       }
 
-      // Apply limit and offset only if they are provided
-      if (limit !== undefined && offset !== undefined) {
-        query = query.limit(limit).offset(offset) as any; // Type assertion to bypass TypeScript error
-      }
+      query = query.limit(limit).offset(offset);
 
       const books = await query.execute();
 
       return {
         items: books as IBook[],
         pagination: {
-          offset: offset || 0, // Default to 0 if not provided
-          limit: limit || books.length, // Default to total number of books if not provided
+          offset: offset || 0,
+          limit: limit || books.length,
           total: books.length,
-          hasNext: limit !== undefined && books.length === limit, // If length matches the limit, there might be more items
+          hasNext: limit !== undefined && books.length === limit,
           hasPrevious: (offset || 0) > 0,
         },
       };

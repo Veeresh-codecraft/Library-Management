@@ -1,5 +1,5 @@
-import http from 'node:http';
-import { URL } from 'node:url';
+import http from "node:http";
+import { URL } from "node:url";
 
 export interface CustomRequest extends http.IncomingMessage {
   [key: string]: any;
@@ -7,124 +7,160 @@ export interface CustomRequest extends http.IncomingMessage {
 
 export type CustomResponse = http.ServerResponse;
 
-type NextMiddlewareExecutor = (error?: AppError) => void;
-type NextMiddlewareExecutorCreator = (
-  req: CustomRequest,
-  response: CustomResponse,
-  next: number
-) => NextMiddlewareExecutor;
+type NextMiddlewareExecutor = (error?: Error) => void;
 
-type Middleware = (
+export type RequestProcessor = (
   request: CustomRequest,
   response: CustomResponse,
-  next?: NextMiddlewareExecutor
+  next: NextMiddlewareExecutor
 ) => void;
 
 type URLPath = string;
-type AllowedHTTPMethods = 'GET' | 'POST' | 'PUT' | 'PATCH';
+type AllowedHTTPMethods = "GET" | "POST" | "PATCH" | "DELETE";
 
-class AppError extends Error {
-  code: number;
-
-  constructor(code: number, message: string) {
-    super(message);
-    this.code = code;
-  }
-}
+type RequestProcessorPathMap = Record<URLPath, RequestProcessor[]>;
 
 export class HTTPServer {
   private port: number;
   private server: ReturnType<typeof http.createServer>;
-  private middlewareMap: Record<AllowedHTTPMethods, Record<URLPath, Middleware[]>> = {
+
+  private processorsMap: Record<AllowedHTTPMethods, RequestProcessorPathMap> = {
     GET: {},
     POST: {},
-    PUT: {},
     PATCH: {},
+    DELETE: {},
   };
-  private appMiddlewares: Middleware[] = [];
+  private globalProcessors: RequestProcessor[] = [];
 
   constructor(port: number) {
     this.port = port;
 
     this.server = http.createServer(
-      (request: CustomRequest, response: CustomResponse) => {
-        if (
-          request.method !== 'GET' &&
-          request.method !== 'POST' &&
-          request.method !== 'PUT' &&
-          request.method !== 'PATCH'
-        ) {
-          response.writeHead(500).end(`Sorry, currently not handling ${request.method}`);
-          return;
+      (request: http.IncomingMessage, response: http.ServerResponse) => {
+        if (this.isValidMethod(request.method)) {
+          this.handleRequest(
+            request as CustomRequest,
+            response as CustomResponse
+          );
+        } else {
+          response
+            .writeHead(405, { "Content-Type": "text/plain" })
+            .end(`Method ${request.method} not allowed`);
         }
-        this.handleRequest(request, response);
       }
     );
 
     this.server.listen(port, () => {
-      console.log('listening at port:', port);
+      console.log(`Server listening on port ${port}`);
     });
+  }
+
+  private isValidMethod(method?: string): method is AllowedHTTPMethods {
+    return ["GET", "POST", "PATCH", "DELETE"].includes(method ?? "");
   }
 
   private handleRequest(request: CustomRequest, response: CustomResponse) {
     if (request.method) {
       const method = request.method as AllowedHTTPMethods;
-
-      const executeMiddleware = (
-        middlewares: Middleware[],
-        nextIndex: number
-      ) => {
-        if (nextIndex < middlewares.length) {
-          const next = this.nextFunctionCreator(request, response, nextIndex, middlewares);
-          middlewares[nextIndex](request, response, next);
-        }
-      };
-
-      executeMiddleware(this.appMiddlewares, 0);
-
-      const url = new URL(request.url ?? '', `http://${request.headers.host}`);
+      const baseUrl = `http://${request.headers.host}`;
+      const url = new URL(request.url ?? "", baseUrl);
       const path = url.pathname;
-      const requestMiddlewares = this.middlewareMap[method][path] || [];
-      executeMiddleware(requestMiddlewares, 0);
+
+      const globalMiddlewares = this.globalProcessors;
+      const pathMiddlewares = this.processorsMap[method][path] || [];
+
+      // Execute global processors and path-specific processors
+      this.executeMiddleware(request, response, [
+        ...globalMiddlewares,
+        ...pathMiddlewares,
+      ]);
     }
-  }
-
-  public get(path: string, middleware: Middleware) {
-    this.middlewareMap['GET'][path] = this.middlewareMap['GET'][path] || [];
-    this.middlewareMap['GET'][path].push(middleware);
-  }
-
-  public post(path: string, middleware: Middleware) {
-    this.middlewareMap['POST'][path] = this.middlewareMap['POST'][path] || [];
-    this.middlewareMap['POST'][path].push(middleware);
-  }
-
-  public put(path: string, middleware: Middleware) {
-    this.middlewareMap['PUT'][path] = this.middlewareMap['PUT'][path] || [];
-    this.middlewareMap['PUT'][path].push(middleware);
-  }
-
-  public patch(path: string, middleware: Middleware) {
-    this.middlewareMap['PATCH'][path] = this.middlewareMap['PATCH'][path] || [];
-    this.middlewareMap['PATCH'][path].push(middleware);
-  }
-
-  public use(middleware: Middleware) {
-    this.appMiddlewares.push(middleware);
   }
 
   private nextFunctionCreator(
     request: CustomRequest,
     response: CustomResponse,
-    nextIndex: number,
-    middlewares: Middleware[]
+    middlewares: RequestProcessor[],
+    nextIndex: number
   ): NextMiddlewareExecutor {
-    return (error?: AppError) => {
+    return (error?: Error) => {
       if (error) {
-        response.writeHead(error.code).end(error.message);
-      } else if (nextIndex < middlewares.length - 1) {
-        middlewares[nextIndex + 1](request, response, this.nextFunctionCreator(request, response, nextIndex + 1, middlewares));
+        response.writeHead(500, { "Content-Type": "application/json" });
+        response.end(
+          JSON.stringify({ error: `Internal server error: ${error.message}` })
+        );
+      } else {
+        if (nextIndex < middlewares.length) {
+          this.executeMiddleware(request, response, middlewares, nextIndex);
+        } else {
+          if (!response.headersSent) {
+            response.writeHead(404, { "Content-Type": "text/plain" });
+            response.end("Not Found");
+          }
+        }
       }
     };
+  }
+
+  private executeMiddleware(
+    request: CustomRequest,
+    response: CustomResponse,
+    middlewares: RequestProcessor[],
+    nextIndex: number = 0
+  ) {
+    const currentMiddleware = middlewares[nextIndex];
+    if (currentMiddleware) {
+      try {
+        currentMiddleware(
+          request,
+          response,
+          this.nextFunctionCreator(
+            request,
+            response,
+            middlewares,
+            nextIndex + 1
+          )
+        );
+      } catch (error) {
+        response.writeHead(500, { "Content-Type": "application/json" });
+        response.end(
+          JSON.stringify({
+            error: `Internal server error: ${(error as Error).message}`,
+          })
+        );
+      }
+    }
+  }
+
+  // Methods to help register processors for respective methods and paths
+  public get(path: string, ...processors: RequestProcessor[]) {
+    this.registerProcessors("GET", path, processors);
+  }
+
+  public post(path: string, ...processors: RequestProcessor[]) {
+    this.registerProcessors("POST", path, processors);
+  }
+
+  public patch(path: string, ...processors: RequestProcessor[]) {
+    this.registerProcessors("PATCH", path, processors);
+  }
+
+  public delete(path: string, ...processors: RequestProcessor[]) {
+    this.registerProcessors("DELETE", path, processors);
+  }
+
+  private registerProcessors(
+    method: AllowedHTTPMethods,
+    path: string,
+    processors: RequestProcessor[]
+  ) {
+    if (!this.processorsMap[method][path]) {
+      this.processorsMap[method][path] = [];
+    }
+    this.processorsMap[method][path].push(...processors);
+  }
+
+  public use(processor: RequestProcessor) {
+    this.globalProcessors.push(processor);
   }
 }
