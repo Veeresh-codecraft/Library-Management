@@ -31,6 +31,7 @@ export class HTTPServer {
     DELETE: {},
   };
   private globalProcessors: RequestProcessor[] = [];
+  private pathSpecificProcessors: RequestProcessorPathMap = {};
 
   constructor(port: number) {
     this.port = port;
@@ -67,12 +68,14 @@ export class HTTPServer {
       const path = url.pathname;
 
       const globalMiddlewares = this.globalProcessors;
-      const pathMiddlewares = this.processorsMap[method][path] || [];
+      const pathSpecificMiddleware = this.pathSpecificProcessors[path];
+      const middlewares = this.processorsMap[method][path] || [];
 
       // Execute global processors and path-specific processors
       this.executeMiddleware(request, response, [
         ...globalMiddlewares,
-        ...pathMiddlewares,
+        ...pathSpecificMiddleware,
+        ...middlewares,
       ]);
     }
   }
@@ -132,21 +135,30 @@ export class HTTPServer {
     }
   }
 
-  // Methods to help register processors for respective methods and paths
-  public get(path: string, ...processors: RequestProcessor[]) {
-    this.registerProcessors("GET", path, processors);
+  //global to attach middle ware for every request
+  public global(...processor: RequestProcessor[]) {
+    this.globalProcessors.push(...processor);
+  }
+  //TODO: method specific middleware
+
+  //to add path specific middleware
+  public addPathSpecificMiddleware(
+    path: string,
+    ...processors: RequestProcessor[]
+  ) {
+    if (!this.pathSpecificProcessors[path]) {
+      this.pathSpecificProcessors[path] = [];
+    }
+    this.pathSpecificProcessors[path].push(...processors);
   }
 
-  public post(path: string, ...processors: RequestProcessor[]) {
-    this.registerProcessors("POST", path, processors);
-  }
-
-  public patch(path: string, ...processors: RequestProcessor[]) {
-    this.registerProcessors("PATCH", path, processors);
-  }
-
-  public delete(path: string, ...processors: RequestProcessor[]) {
-    this.registerProcessors("DELETE", path, processors);
+  //add middleware to method
+  public processorWithMethod(
+    method: AllowedHTTPMethods,
+    path: string,
+    ...processors: RequestProcessor[]
+  ) {
+    this.registerProcessors(method, path, processors);
   }
 
   private registerProcessors(
@@ -158,9 +170,5 @@ export class HTTPServer {
       this.processorsMap[method][path] = [];
     }
     this.processorsMap[method][path].push(...processors);
-  }
-
-  public use(processor: RequestProcessor) {
-    this.globalProcessors.push(processor);
   }
 }

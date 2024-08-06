@@ -9,16 +9,13 @@ import { BookRepository } from "../src/book-management/books.repository";
 import { IncomingMessage, ServerResponse } from "http";
 import { IBook } from "../src/book-management/models/books.model";
 
-// Define port number
 const port: number = 3000;
 
-// Create instances
 const server = new HTTPServer(port);
 const drizzleManager = new DrizzleManager();
 const db = drizzleManager.getPoolDrizzle();
 const repo = new BookRepository(db);
 
-// Extend the IncomingMessage interface to include a body property
 declare module "http" {
   interface IncomingMessage {
     body?: any;
@@ -285,13 +282,22 @@ const deleteBook: RequestProcessor = async (request, response) => {
 };
 
 // Apply middleware
-server.use(globalMiddleware);
-server.use(jsonParserMiddleware);
+server.global(globalMiddleware, jsonParserMiddleware);
+
+//apply middleware to path specified
+server.addPathSpecificMiddleware("/books", validateBookDataMiddleware);
 
 // Register routes with validation where needed
-server.post("/books", validateBookDataMiddleware, createBook);
-server.get("/books", getAllBooks);
-server.patch("/books", validateBookDataMiddleware, updateBook);
-server.delete("/books", deleteBook);
+server.processorWithMethod("POST", "/books", createBook);
+server.processorWithMethod("GET", "/books", getAllBooks);
+
+//can also have more than one middleware
+server.processorWithMethod(
+  "PATCH",
+  "/books",
+  validateBookDataMiddleware,
+  updateBook
+);
+server.processorWithMethod("DELETE", "/books", deleteBook);
 
 console.log(`Server running on port ${port}`);
