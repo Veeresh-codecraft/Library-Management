@@ -151,7 +151,6 @@ export class HTTPServer {
     }
     this.pathSpecificProcessors[path].push(...processors);
   }
-
   //add middleware to method
   public processorWithMethod(
     method: AllowedHTTPMethods,
