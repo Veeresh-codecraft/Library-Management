@@ -3,7 +3,7 @@ import {
   RequestProcessor,
   CustomRequest,
   CustomResponse,
-} from "./newServer";
+} from "../newServer";
 import { DrizzleManager } from "../../src/drizzleDbConnection";
 import { BookRepository } from "../../src/book-management/books.repository";
 import { IncomingMessage, ServerResponse } from "http";

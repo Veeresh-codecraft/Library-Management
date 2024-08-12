@@ -1,1 +1,0 @@
-ALTER TABLE `trainee` ADD `email` varchar(255);

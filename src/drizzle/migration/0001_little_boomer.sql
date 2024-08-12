@@ -1,1 +1,0 @@
-ALTER TABLE `trainee` DROP COLUMN `email`;
