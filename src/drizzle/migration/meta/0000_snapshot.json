@@ -1,7 +1,7 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "9b00e312-4c4a-489f-bd41-d9959582637f",
+  "id": "e6f27792-cf24-4dba-8c3a-9d78e3fa42c2",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "books": {
@@ -83,8 +83,8 @@
       },
       "uniqueConstraints": {}
     },
-    "trainee": {
-      "name": "trainee",
+    "refresh_tokens": {
+      "name": "refresh_tokens",
       "columns": {
         "id": {
           "name": "id",
@@ -93,26 +93,62 @@
           "notNull": true,
           "autoincrement": true
         },
-        "name": {
-          "name": "name",
-          "type": "varchar(255)",
+        "userId": {
+          "name": "userId",
+          "type": "int",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "email": {
-          "name": "email",
-          "type": "varchar(255)",
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "issuedAt": {
+          "name": "issuedAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(now())"
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "revokedAt": {
+          "name": "revokedAt",
+          "type": "timestamp",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "refresh_tokens_userId_users_userId_fk": {
+          "name": "refresh_tokens_userId_users_userId_fk",
+          "tableFrom": "refresh_tokens",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "userId"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {
-        "trainee_id": {
-          "name": "trainee_id",
+        "refresh_tokens_id": {
+          "name": "refresh_tokens_id",
           "columns": [
             "id"
           ]
@@ -125,7 +161,7 @@
       "columns": {
         "transactionId": {
           "name": "transactionId",
-          "type": "int",
+          "type": "serial",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": true
@@ -144,8 +180,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "issueddate": {
-          "name": "issueddate",
+        "issuedDate": {
+          "name": "issuedDate",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true,
@@ -177,7 +213,34 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "transactions_userId_users_userId_fk": {
+          "name": "transactions_userId_users_userId_fk",
+          "tableFrom": "transactions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "userId"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "transactions_bookId_books_id_fk": {
+          "name": "transactions_bookId_books_id_fk",
+          "tableFrom": "transactions",
+          "tableTo": "books",
+          "columnsFrom": [
+            "bookId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {
         "transactions_transactionId": {
           "name": "transactions_transactionId",
@@ -212,8 +275,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "passwordHash": {
-          "name": "passwordHash",
+        "password": {
+          "name": "password",
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true,

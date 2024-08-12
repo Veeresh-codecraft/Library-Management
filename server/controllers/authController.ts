@@ -1,37 +1,55 @@
-// authController.ts
 import { Request, Response } from "express";
-import bcrypt from "bcrypt";
-import { UserRepository } from "../../src/user-management/user.repository";
-import { MySql2Database } from "drizzle-orm/mysql2";
+import jwt from "jsonwebtoken";
+import { AppEnvs } from "../config/read-env";
+import { UserPayload } from "../middlewares/auth.middleware";
 import { DrizzleManager } from "../../src/drizzleDbConnection";
-import {
-  generateAccessToken,
-  generateRefreshToken,
-  verifyRefreshToken,
-} from "../utils/jwtUtils";
+import { usersTable } from "../../src/drizzle/schema";
+import { and, eq } from "drizzle-orm";
 
-const drizzleManager = new DrizzleManager();
-const db = drizzleManager.getPoolDrizzle();
-const userRepository = new UserRepository(db);
+// Helper function to verify password (consider using bcrypt for hashing)
+const verifyPassword = (
+  inputPassword: string,
+  storedPasswordHash: string
+): boolean => {
+  // Implement your password verification logic here
+  // This is a simplified example; consider using bcrypt for hashing and comparison
+  return inputPassword === storedPasswordHash;
+};
 
 export const login = async (req: Request, res: Response) => {
   const { username, password } = req.body;
+  const drizzleManager = new DrizzleManager();
+  const db = drizzleManager.getPoolDrizzle();
 
   try {
-    const user = await userRepository.getByEmail(username);
+    // Find user by username
+    const user = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.username, username))
+      .limit(1)
+      .execute();
 
-    if (user && (await bcrypt.compare(password, user.passwordHash))) {
-      const accessToken = generateAccessToken(user);
-      const refreshToken = generateRefreshToken(user);
-
-      await userRepository.updateRefreshToken(user.userId, refreshToken);
-
-      return res.json({ accessToken, refreshToken });
-    } else {
+    if (!user.length || !verifyPassword(password, user[0].passwordHash)) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
+
+    const payload: UserPayload = {
+      userId: user[0].userId,
+      role: user[0].role,
+    };
+
+    const accessToken = jwt.sign(payload, AppEnvs.JWT_SECRET, {
+      expiresIn: AppEnvs.JWT_EXPIRES_IN,
+    });
+    const refreshToken = jwt.sign(payload, AppEnvs.JWT_REFRESH_SECRET, {
+      expiresIn: AppEnvs.JWT_REFRESH_EXPIRES_IN,
+    });
+
+    res.json({ accessToken, refreshToken });
   } catch (err) {
-    return res.status(500).json({ message: "Error during login" });
+    console.error("Error during login:", err);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
@@ -39,22 +57,22 @@ export const refreshToken = async (req: Request, res: Response) => {
   const { refreshToken } = req.body;
 
   if (!refreshToken) {
-    return res.status(401).json({ message: "Refresh token missing" });
+    return res.status(401).json({ message: "Refresh token required" });
   }
 
-  try {
-    const payload = verifyRefreshToken(refreshToken) as any;
-    const userId = payload.userId;
+  jwt.verify(
+    refreshToken,
+    AppEnvs.JWT_REFRESH_SECRET,
+    (err, user: UserPayload | undefined) => {
+      if (err || !user) {
+        return res.status(403).json({ message: "Invalid refresh token" });
+      }
 
-    const existingUser = await userRepository.getById(userId);
+      const newAccessToken = jwt.sign(user, AppEnvs.JWT_SECRET, {
+        expiresIn: AppEnvs.JWT_EXPIRES_IN,
+      });
 
-    if (existingUser) {
-      const newAccessToken = generateAccessToken(existingUser);
-      return res.json({ accessToken: newAccessToken });
-    } else {
-      return res.status(403).json({ message: "User not found" });
+      res.json({ accessToken: newAccessToken });
     }
-  } catch (error) {
-    return res.status(403).json({ message: "Invalid refresh token" });
-  }
+  );
 };

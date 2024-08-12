@@ -12,13 +12,8 @@ import {
   tinyint,
   mysqlEnum,
 } from "drizzle-orm/mysql-core";
-import { UserRole } from "../user-management/userRole";
-export const traineeTable = mysqlTable("trainee", {
-  id: serial("id").primaryKey().notNull(),
-  name: varchar("name", { length: 255 }).notNull(),
-  email: varchar("email", { length: 255 }),
-});
 
+// Books Table
 export const booksTable = mysqlTable("books", {
   id: serial("id").primaryKey().notNull(),
   title: varchar("title", { length: 255 }).notNull(),
@@ -31,6 +26,7 @@ export const booksTable = mysqlTable("books", {
   availableNumberOfCopies: int("availableNumberOfCopies").notNull(),
 });
 
+// Users Table
 export const usersTable = mysqlTable("users", {
   userId: int("userId").primaryKey().autoincrement(),
   username: varchar("username", { length: 255 }).notNull(),
@@ -39,12 +35,29 @@ export const usersTable = mysqlTable("users", {
   role: varchar("role", { length: 255 }).notNull(),
 });
 
-export const transaction = mysqlTable("transactions", {
-  transactionId: int("transactionId").primaryKey().autoincrement(),
-  userId: int("userId").notNull(),
-  bookId: int("bookId").notNull(),
-  issueddate: timestamp("issueddate").defaultNow().notNull(),
+// Transactions Table
+export const transactionsTable = mysqlTable("transactions", {
+  transactionId: serial("transactionId").primaryKey().notNull(),
+  userId: int("userId")
+    .notNull()
+    .references(() => usersTable.userId),
+  bookId: int("bookId")
+    .notNull()
+    .references(() => booksTable.id),
+  issuedDate: timestamp("issuedDate").defaultNow().notNull(),
   returnDate: varchar("returnDate", { length: 100 }).notNull(),
   isReturned: tinyint("isReturned").default(0).notNull(),
   fine: int("fine").default(0).notNull(),
+});
+
+// Refresh Tokens Table
+export const refreshTokensTable = mysqlTable("refresh_tokens", {
+  id: serial("id").primaryKey().notNull(),
+  userId: int("userId")
+    .notNull()
+    .references(() => usersTable.userId),
+  token: text("token").notNull(),
+  issuedAt: timestamp("issuedAt").defaultNow().notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  revokedAt: timestamp("revokedAt"),
 });

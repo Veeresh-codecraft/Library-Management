@@ -1,7 +1,7 @@
 import bcrypt from "bcrypt";
 import { IRepository } from "../../core/repository";
 import { MySql2Database } from "drizzle-orm/mysql2";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, like, sql } from "drizzle-orm";
 import { usersTable } from "../drizzle/schema";
 import { IUserBase, IUser } from "../user-management/models/user.model";
 
@@ -27,22 +27,25 @@ export class UserRepository implements IRepository<IUserBase, IUser> {
     };
 
     try {
-      console.log(user);
-      const [result] = await this.db
+      const [insertedUserId] = await this.db
         .insert(usersTable)
         .values(user)
         .$returningId();
 
-      const insertedUserId = result.userId;
       if (insertedUserId) {
-        const [insertedUser] = await this.db
+        const insertedUser = await this.db
           .select()
           .from(usersTable)
-          .where(eq(usersTable.userId, insertedUserId));
-        return insertedUser as IUser;
+          .where(eq(usersTable.userId, insertedUserId.userId))
+          .execute();
+
+        if (insertedUser.length > 0) {
+          return insertedUser[0] as IUser;
+        } else {
+          throw new Error("Failed to retrieve the inserted user.");
+        }
       } else {
-        console.error("Inserted But ID not matching");
-        return user as IUser;
+        throw new Error("Failed to insert user.");
       }
     } catch (err) {
       console.error("Error creating user:", err);
@@ -58,27 +61,27 @@ export class UserRepository implements IRepository<IUserBase, IUser> {
    */
   async update(id: number, data: IUser): Promise<IUser | null> {
     try {
-      const result = await this.db
+      const [result] = await this.db
         .update(usersTable)
         .set(data)
-        .where(sql`${usersTable.userId} = ${id}`)
+        .where(eq(usersTable.userId, id))
         .execute();
 
-      if (result) {
+      if (result.affectedRows > 0) {
         const [updatedUser] = await this.db
           .select()
           .from(usersTable)
-          .where(sql`${usersTable.userId} = ${id}`)
+          .where(eq(usersTable.userId, id))
           .execute();
 
         return updatedUser as IUser;
       } else {
-        console.log("Unable to update the user");
+        console.log("Unable to update the user: User not found.");
         return null;
       }
     } catch (err) {
       console.error("Error updating user:", err);
-      return null;
+      throw err;
     }
   }
 
@@ -92,25 +95,22 @@ export class UserRepository implements IRepository<IUserBase, IUser> {
       const [deletingUser] = await this.db
         .select()
         .from(usersTable)
-        .where(eq(usersTable.userId, id));
+        .where(eq(usersTable.userId, id))
+        .execute();
+
       if (deletingUser) {
-        const [result] = await this.db
+        await this.db
           .delete(usersTable)
-          .where(eq(usersTable.userId, id));
-        if (result) {
-          return deletingUser as IUser;
-        } else {
-          console.error("Deleting unsuccessful");
-          return null;
-        }
+          .where(eq(usersTable.userId, id))
+          .execute();
+        return deletingUser as IUser;
       } else {
-        console.error("User does not exist");
+        console.log("User does not exist.");
         return null;
       }
     } catch (err) {
       console.error("Error deleting user:", err);
-      throw new Error("Deletion failed");
-      return null;
+      throw err;
     }
   }
 
@@ -124,7 +124,9 @@ export class UserRepository implements IRepository<IUserBase, IUser> {
       const [user] = await this.db
         .select()
         .from(usersTable)
-        .where(eq(usersTable.userId, id));
+        .where(eq(usersTable.userId, id))
+        .execute();
+
       return user as IUser;
     } catch (err) {
       console.error("Error fetching user:", err);
@@ -141,35 +143,41 @@ export class UserRepository implements IRepository<IUserBase, IUser> {
    * @returns {Promise<{items: IUser[], pagination: {offset: number, limit: number, total: number, hasNext: boolean, hasPrevious: boolean}}>}
    */
   async list(params: {
-    limit?: number;
-    offset?: number;
-    search?: string;
+    limit?: number; // Optional
+    offset?: number; // Optional
+    search?: string; // Optional
   }): Promise<any> {
     const { limit = 10, offset = 0, search } = params;
 
     try {
+      // Start building the query for the users table
       let query = this.db.select().from(usersTable) as any;
 
+      // Apply search filter if provided
       if (search) {
         query = query.where(
-          sql`${usersTable.username} LIKE ${`%${search}%`} OR ${
-            usersTable.email
-          } LIKE ${`%${search}%`}`
-        );
+          and(
+            like(usersTable.username, `%${search}%`),
+            like(usersTable.email, `%${search}%`)
+          )
+        ) as any;
       }
 
+      // Apply pagination (limit and offset)
       query = query.limit(limit).offset(offset);
 
+      // Execute the query to get the filtered and paginated list of users
       const users = await query.execute();
 
+      // Return the paginated users and pagination information
       return {
         items: users as IUser[],
         pagination: {
-          offset: offset || 0,
-          limit: limit || users.length,
+          offset: offset,
+          limit: limit,
           total: users.length,
           hasNext: limit !== undefined && users.length === limit,
-          hasPrevious: (offset || 0) > 0,
+          hasPrevious: offset > 0,
         },
       };
     } catch (err) {
