@@ -4,10 +4,10 @@ import {
   CustomRequest,
   CustomResponse,
 } from "./newServer";
-import { DrizzleManager } from "../src/drizzleDbConnection";
-import { BookRepository } from "../src/book-management/books.repository";
+import { DrizzleManager } from "../../src/drizzleDbConnection";
+import { BookRepository } from "../../src/book-management/books.repository";
 import { IncomingMessage, ServerResponse } from "http";
-import { IBook } from "../src/book-management/models/books.model";
+import { IBook } from "../../src/book-management/models/books.model";
 
 const port: number = 3000;
 
