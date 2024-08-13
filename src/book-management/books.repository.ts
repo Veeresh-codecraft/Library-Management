@@ -139,8 +139,8 @@ export class BookRepository implements IRepository<IBookBase, IBook> {
   }
 
   async list(params: {
-    limit: number; // Optional
-    offset: number; // Optional
+    limit?: number; // Optional
+    offset?: number; // Optional
     search?: string; // Optional
   }): Promise<any> {
     const { limit = 10, offset = 2, search } = params;

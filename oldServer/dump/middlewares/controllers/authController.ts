@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import { AppEnvs } from "../config/read-env";
+import { AppEnvs } from "../../../../server/read-env";
 import { UserPayload } from "../middlewares/auth.middleware";
-import { DrizzleManager } from "../../src/drizzleDbConnection";
-import { usersTable } from "../../src/drizzle/schema";
+import { DrizzleManager } from "../../../../src/drizzleDbConnection";
+import { usersTable } from "../../../../src/drizzle/schema";
 import { and, eq } from "drizzle-orm";
 
 // Helper function to verify password (consider using bcrypt for hashing)

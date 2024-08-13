@@ -1,39 +1,38 @@
 import { Request, Response, NextFunction } from "express";
-import jwt, { VerifyErrors } from "jsonwebtoken";
-import { AppEnvs } from "../config/read-env";
+import jwt from "jsonwebtoken";
+import { UserPayload } from "../../oldServer/dump/middlewares/middlewares/auth.middleware";
+import "dotenv/config";
 
-// Define the shape of the user payload for the JWT token
-export interface UserPayload {
-  userId: number;
-  role: string;
-}
-
-// Augment the Request interface directly
-declare module "express-serve-static-core" {
-  interface Request {
-    user?: UserPayload; // Adding user property to Request
-  }
-}
-
-// Middleware to authenticate JWT tokens
-export const authenticateToken = (
+export const authenticateJWT = (
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1]; // Bearer <token>
+  const accessTokenSecret =
+    process.env.ACCESS_TOKEN_SECRET || "default_access_token_secret";
+  const authHeader = req.headers.authorization;
 
-  if (!token) return res.status(401).json({ message: "Access token required" });
+  if (authHeader) {
+    const token = authHeader.split(" ")[1];
 
-  jwt.verify(
-    token,
-    AppEnvs.JWT_SECRET,
-    (err: VerifyErrors | null, decoded: any) => {
-      if (err) return res.status(403).json({ message: "Invalid access token" });
-
-      req.user = decoded as UserPayload; // Type assertion
+    jwt.verify(token, accessTokenSecret, (err, user) => {
+      if (err) {
+        return res.sendStatus(403);
+      }
+      req.user = user as UserPayload;
       next();
+    });
+  } else {
+    res.sendStatus(401);
+  }
+};
+
+export const authorizeRoles = (...roles: string[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (roles.includes(req.user!.role)) {
+      next();
+    } else {
+      res.sendStatus(403);
     }
-  );
+  };
 };
