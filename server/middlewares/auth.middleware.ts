@@ -17,6 +17,14 @@ export const authenticateJWT = (
 
     jwt.verify(token, accessTokenSecret, (err, user) => {
       if (err) {
+        if (
+          err.name === "TokenExpiredError" ||
+          err.name === "JsonWebTokenError"
+        ) {
+          const refreshToken = req.cookies.refreshToken;
+          //TODO:verify fro jwt.verify(refreshToken, refreshTokenSecret, (refreshErr, user)
+          //if it is present then update postman gloable varibale
+        }
         return res.sendStatus(403);
       }
       req.user = user as UserPayload;
