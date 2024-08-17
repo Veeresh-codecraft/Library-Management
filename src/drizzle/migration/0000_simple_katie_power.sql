@@ -17,7 +17,7 @@ CREATE TABLE `refresh_tokens` (
 	`token` text NOT NULL,
 	`issuedAt` timestamp NOT NULL DEFAULT (now()),
 	`expiresAt` timestamp NOT NULL,
-	`revokedAt` timestamp,
+	`ip` text NOT NULL,
 	CONSTRAINT `refresh_tokens_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint

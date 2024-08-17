@@ -59,5 +59,5 @@ export const refreshTokensTable = mysqlTable("refresh_tokens", {
   token: text("token").notNull(),
   issuedAt: timestamp("issuedAt").defaultNow().notNull(),
   expiresAt: timestamp("expiresAt").notNull(),
-  revokedAt: timestamp("revokedAt"),
+  ip: text("ip"),
 });

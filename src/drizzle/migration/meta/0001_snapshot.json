@@ -1,8 +1,8 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "1a10682f-db15-43ea-800e-9344ddf9ea56",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "66c7fea3-d68d-4cfe-923c-1d3fd36eab49",
+  "prevId": "1a10682f-db15-43ea-800e-9344ddf9ea56",
   "tables": {
     "books": {
       "name": "books",
@@ -124,7 +124,7 @@
         },
         "ip": {
           "name": "ip",
-          "type": "text",
+          "type": "varchar(100)",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false

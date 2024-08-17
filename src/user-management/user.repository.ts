@@ -185,4 +185,12 @@ export class UserRepository implements IRepository<IUserBase, IUser> {
       throw err;
     }
   }
+  async findByEmail(email: string) {
+    const [user] = await this.db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.email, email))
+      .execute();
+    return user;
+  }
 }
