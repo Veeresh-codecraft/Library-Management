@@ -9,11 +9,13 @@ import cookieParser from "cookie-parser";
 import jwt from "jsonwebtoken";
 import { DrizzleManager } from "../../src/drizzleDbConnection";
 import { UserRepository } from "../../src/user-management/user.repository";
+import { generateAccessToken } from "../utils/jwtTokenGenerators";
 const drizzleManager = new DrizzleManager();
 const db = drizzleManager.getPoolDrizzle();
 const userRepository = new UserRepository(db);
 
 export const userRouter = Router();
+
 const oauth2Client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID!,
   process.env.GOOGLE_CLIENT_SECRET!,
@@ -22,9 +24,6 @@ const oauth2Client = new OAuth2Client(
 userRouter.post("/register", registerUser);
 userRouter.post("/login", loginUser);
 userRouter.post("/logout", logoutUser);
-function express() {
-  throw new Error("Function not implemented.");
-}
 
 // Google OAuth login
 userRouter.get("/auth/google", (req, res) => {
@@ -39,10 +38,11 @@ userRouter.get("/auth/google", (req, res) => {
 userRouter.get("/auth/google/callback", async (req, res) => {
   const code = req.query.code as string;
   if (!code) {
-    return res.status(400).send("Missing code");
+    return res.status(400).send("Not Allowed (Missing code)");
   }
 
   try {
+    // Exchange authorization code for tokens
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
     const idToken = tokens.id_token as string;
@@ -51,6 +51,7 @@ userRouter.get("/auth/google/callback", async (req, res) => {
       throw new Error("ID token is missing from the tokens");
     }
 
+    // Verify the ID token
     const ticket = await oauth2Client.verifyIdToken({
       idToken,
       audience: process.env.GOOGLE_CLIENT_ID!,
@@ -64,22 +65,39 @@ userRouter.get("/auth/google/callback", async (req, res) => {
     const email = payload.email as string;
     const user = await userRepository.findByEmail(email);
 
+    let token;
     if (user) {
-      const token = jwt.sign({ userId: user.userId }, process.env.JWT_SECRET!);
-      return res.json({ token });
+      token = generateAccessToken(user);
+      // token = jwt.sign({ userId: user.userId }, process.env.JWT_SECRET!);
+      console.log(token);
     } else {
       const newUser = await userRepository.create({
         username: payload.name || "",
         email,
-        passwordHash: "", // No password for OAuth users
+        passwordHash: "",
         role: "user",
       });
-      const token = jwt.sign(
-        { userId: newUser.userId },
-        process.env.JWT_SECRET!
-      );
-      return res.json({ token });
+      // token = jwt.sign({ userId: newUser.userId }, process.env.JWT_SECRET!);
+      token = generateAccessToken(user);
     }
+
+    // Fetch the /books endpoint with the token
+    const booksResponse = await fetch("http://localhost:3000/books", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!booksResponse.ok) {
+      throw new Error("Failed to fetch books");
+    }
+
+    const booksData = await booksResponse.json();
+
+    // Send the books data as the response
+    res.json(booksData);
   } catch (error) {
     console.error("Authentication error:", error);
     return res.status(500).send("Authentication error");
