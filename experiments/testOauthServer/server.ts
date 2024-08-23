@@ -3,9 +3,9 @@ import dotenv from "dotenv";
 import { OAuth2Client } from "google-auth-library";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { UserRepository } from "../src/user-management/user.repository";
-import { BookRepository } from "../src/book-management/books.repository";
-import { DrizzleManager } from "../src/drizzleDbConnection";
+import { UserRepository } from "../../src/user-management/user.repository";
+import { BookRepository } from "../../src/book-management/books.repository";
+import { DrizzleManager } from "../../src/drizzleDbConnection";
 import { authenticateJWT } from "./auth.middleware";
 
 dotenv.config();
